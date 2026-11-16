@@ -1,0 +1,2428 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minha Estante</title>
+
+  <!-- Aplica o tema (claro/escuro) antes da página aparecer, para não piscar -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("tema") || "auto";
+        var escuro = t === "escuro" || (t === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.setAttribute("data-tema", escuro ? "escuro" : "claro");
+      } catch (e) {}
+    })();
+  </script>
+
+  <style>
+    /* ===== CORES: tema claro (branco) ===== */
+    :root {
+      --papel: #ffffff;          /* fundo das páginas */
+      --papel-escuro: #f4f1ec;   /* painel de busca */
+      --barra: #ffffff;          /* barras de cima e de baixo */
+      --linha: #e6e1d8;          /* linhas finas de separação */
+      --icone: #8d8d8d;          /* ícone apagado do menu */
+      --icone-ativo: #2f5d4e;    /* ícone da aba atual */
+      --campo: #faf8f4;          /* fundo de campos e seletores */
+      --borda: #cdbfa6;
+      --tinta: #2a2118;          /* texto principal */
+      --suave: #6b6256;          /* texto secundário */
+      --suave2: #8a8277;
+      --card: #ffffff;
+      --painel: rgba(255,255,255,.95);
+      --fora: #e9e6e0;           /* fundo fora da "tela do celular" */
+      --destaque: #2f5d4e;
+      --perigo: #a33;
+      --estrela: #e0a526;
+      color-scheme: light;
+    }
+    /* ===== CORES: tema escuro (preto) ===== */
+    :root[data-tema="escuro"] {
+      --papel: #111111;
+      --papel-escuro: #1c1c1e;
+      --barra: #1a1a1a;
+      --linha: #2c2c2e;
+      --icone: #8e8e93;
+      --icone-ativo: #7fcfb2;
+      --campo: #2a2a2c;
+      --borda: #4a463f;
+      --tinta: #f2efe9;
+      --suave: #b5aea3;
+      --suave2: #8e887e;
+      --card: #242426;
+      --painel: rgba(28,28,30,.95);
+      --fora: #000000;
+      --destaque: #3f8a73;
+      --perigo: #ff7b7b;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }   /* garante que "hidden" sempre esconde */
+    body { margin: 0; background: var(--fora); color: var(--tinta); font-family: Georgia, "Times New Roman", serif; }
+    button, input, select, textarea { font-family: inherit; font-size: 14px; }
+    input, select, textarea { color: var(--tinta); }
+    .icone { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8;
+             stroke-linecap: round; stroke-linejoin: round; }
+
+    /* O "celular": uma coluna centralizada */
+    #app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--papel);
+           padding-bottom: 76px; box-shadow: 0 0 20px rgba(0,0,0,.25); }
+
+    /* Topo */
+    .topo { position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between;
+            align-items: center; padding: 12px 16px; background: var(--barra); color: var(--tinta);
+            border-bottom: 1px solid var(--linha); }
+    .topo-esq { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .topo h1 { margin: 0; font-size: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lupa, .voltar, .seta { background: none; border: none; cursor: pointer; color: var(--tinta); padding: 4px; display: flex; }
+    .voltar { margin-left: -6px; }
+
+    /* Painel de busca (desce quando toca na lupa) */
+    .painel-busca { background: var(--papel-escuro); padding: 12px 16px 16px;
+                    border-bottom: 3px solid var(--borda); animation: descer .25s ease; }
+    @keyframes descer { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+    .linha-busca { display: flex; gap: 8px; }
+    .linha-busca input { flex: 1; min-width: 0; padding: 10px; border: 1px solid var(--borda);
+                         border-radius: 6px; background: var(--campo); }
+    .botao { background: var(--destaque); color: #fff; border: none; border-radius: 6px;
+             padding: 10px 14px; cursor: pointer; }
+    .opcoes-busca { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 10px 0; font-size: 13px; }
+    .opcoes-busca select { padding: 6px; border-radius: 6px; border: 1px solid var(--borda); background: var(--campo); }
+    #resultados { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .msg { grid-column: 1 / -1; font-style: italic; color: var(--suave); }
+    .card { background: var(--card); border-radius: 8px; padding: 10px; text-align: center;
+            display: flex; flex-direction: column; gap: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+    .card img { height: 130px; margin: 0 auto; border-radius: 3px; }
+    .card .sem-capa { height: 130px; display: flex; align-items: center; justify-content: center;
+                      background: var(--papel-escuro); font-size: 12px; color: var(--suave); border-radius: 3px; }
+    .card h3 { margin: 6px 0 0; font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2;
+               -webkit-box-orient: vertical; overflow: hidden; }
+    .card p { margin: 0 0 6px; font-size: 11px; color: var(--suave); }
+    .card button { background: var(--campo); color: var(--tinta); border: 1px solid var(--borda); border-radius: 6px;
+                   padding: 7px 4px; font-size: 12px; cursor: pointer; }
+
+    /* Abas */
+    .aba { display: none; }
+    .aba.ativa { display: block; }
+
+    /* Início: no máximo 4 capas por categoria */
+    .saudacao { margin: 14px 16px 0; font-size: 15px; color: var(--suave); }
+    .secao-topo { display: flex; justify-content: space-between; align-items: center; margin: 20px 16px 10px; }
+    .secao-topo h2 { margin: 0; font-size: 18px; }
+    .secao-topo small { color: var(--suave2); font-weight: normal; }
+    .grade-capas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 0 16px 6px; }
+    .grade-capas img, .sem-capa-mini { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 3px;
+                   cursor: pointer; box-shadow: 1px 2px 6px rgba(0,0,0,.35); }
+    .sem-capa-mini { padding: 6px; display: flex; align-items: center; text-align: center; font-size: 11px;
+                     background: var(--destaque); color: #fff; overflow: hidden; word-break: break-word; }
+    .vazio { margin: 0 16px; font-size: 14px; font-style: italic; color: var(--suave2); }
+
+    /* Página com todos os livros de uma categoria (estilo Kindle) */
+    .qtd-lista { margin: 14px 16px 4px; font-size: 13px; color: var(--suave2); }
+    .item-lista { display: flex; gap: 14px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--linha); cursor: pointer; }
+    .item-lista .capa-lista { width: 72px; flex-shrink: 0; }
+    .item-lista .capa-lista img, .item-lista .capa-lista .sem-capa-mini { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; }
+    .item-lista h3 { margin: 0 0 4px; font-size: 16px; line-height: 1.25; }
+    .item-lista p { margin: 0; font-size: 14px; color: var(--suave); }
+    .item-lista .data { margin-top: 6px; font-size: 12px; color: var(--suave2); }
+    .item-lista .estrelas-mini { margin-top: 6px; font-size: 14px; color: var(--estrela); letter-spacing: 1px; }
+
+    /* Página de um livro */
+    .livro-pagina { padding: 16px; }
+    .livro-cabeca { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 4px; }
+    .livro-cabeca .capa-grande { width: 110px; flex-shrink: 0; }
+    .livro-cabeca .capa-grande img, .livro-cabeca .capa-grande .sem-capa-mini { width: 100%; aspect-ratio: 2 / 3; object-fit: cover;
+                   border-radius: 3px; box-shadow: 2px 3px 8px rgba(0,0,0,.4); cursor: default; }
+    .livro-cabeca h2 { margin: 0 0 6px; font-size: 20px; line-height: 1.25; }
+    .livro-cabeca p { margin: 0; color: var(--suave); font-size: 14px; }
+    .estrelas { display: flex; gap: 4px; }
+    .estrelas button { background: none; border: none; padding: 2px; cursor: pointer; color: var(--suave2); display: flex; }
+    .estrelas button.cheia { color: var(--estrela); }
+    .estrelas svg { width: 36px; height: 36px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+    .estrelas button.cheia svg { fill: currentColor; }
+    textarea.anotacao { width: 100%; min-height: 170px; padding: 12px; border: 1px solid var(--borda); border-radius: 8px;
+                        background: var(--campo); font-size: 15px; line-height: 1.5; resize: vertical; }
+    .salvo { margin: 6px 0 0; font-size: 12px; color: var(--suave2); min-height: 16px; }
+
+    /* Estante */
+    /* A parede desce por trás do menu de baixo, sem faixa vazia */
+    .parede { background: #2f5d4e; padding: 16px 8px 92px; margin-bottom: -76px; min-height: calc(100vh - 57px); }
+    .painel-estante { background: var(--painel); border-radius: 10px; padding: 10px; margin: 0 8px 16px; }
+    .filtros { display: flex; gap: 8px; margin-bottom: 10px; }
+    .filtros select { flex: 1; padding: 8px; border-radius: 6px; border: 1px solid var(--borda); background: var(--campo); }
+    .linha-contagem { display: flex; justify-content: space-between; align-items: center; }
+    .contagem { margin: 0; font-size: 13px; color: var(--suave); }
+    .botao-personalizar { display: flex; align-items: center; gap: 6px; background: var(--destaque); color: #fff;
+                          border: none; border-radius: 6px; padding: 7px 10px; font-size: 13px; cursor: pointer; }
+    .botao-personalizar .icone { width: 18px; height: 18px; }
+
+    /* ===== Estante: móvel inteiro ou só prateleiras ===== */
+    /* As cores e a textura de madeira vêm do JavaScript (variáveis --m-... e --grao-...) */
+    /* As estantes ficam lado a lado: deslize para o lado para ver a próxima */
+    #estantes { display: flex; align-items: flex-start; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory;
+                scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 28px; }
+    #estantes::-webkit-scrollbar { display: none; }
+    #estantes.sem-ima { scroll-snap-type: none; }
+    .vaga { flex: 0 0 100%; box-sizing: border-box; padding: 0 8px; scroll-snap-align: start; }
+    .pontos { display: flex; justify-content: center; gap: 9px; min-height: 12px; margin-top: -8px; }
+    .pontos button { width: 9px; height: 9px; padding: 0; border: none; border-radius: 50%; cursor: pointer;
+                     background: rgba(255,255,255,.45); box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+    .pontos button.ativo { background: #fff; transform: scale(1.25); }
+
+    .movel { position: relative; }
+    .movel.inteira { background-color: var(--m-moldura, #6b3f1a); padding: 0 10px; border-radius: 4px 4px 2px 2px;
+                     background-image: var(--grao-v, none),
+                       linear-gradient(90deg, rgba(255,255,255,.16), rgba(255,255,255,0) 7%, rgba(0,0,0,0) 93%, rgba(0,0,0,.3));
+                     box-shadow: 0 16px 20px -8px rgba(0,0,0,.6), 0 2px 5px rgba(0,0,0,.45); }
+    .coroa, .rodape { display: none; }
+    .movel.inteira .coroa { display: block; position: relative; z-index: 3; height: 18px; margin: 0 -16px;
+                     border-radius: 4px 4px 0 0; background-color: var(--m-moldura, #6b3f1a);
+                     background-image: var(--grao-h, none),
+                       linear-gradient(to bottom, rgba(255,255,255,.3) 0, rgba(255,255,255,0) 4px, rgba(0,0,0,0) 11px, rgba(0,0,0,.42) 18px);
+                     box-shadow: 0 4px 7px rgba(0,0,0,.5); }
+    .movel.inteira .rodape { display: block; position: relative; z-index: 3; height: 22px; margin: 0 -14px;
+                     border-radius: 0 0 3px 3px; background-color: var(--m-moldura, #6b3f1a);
+                     background-image: var(--grao-h, none),
+                       linear-gradient(to bottom, rgba(0,0,0,.5) 0, rgba(0,0,0,0) 6px, rgba(255,255,255,.14) 8px, rgba(0,0,0,.4) 22px); }
+
+    /* Parte de dentro (o fundo da estante) */
+    .corpo { position: relative; }
+    .movel.inteira .corpo { background-color: var(--m-fundo, #b08752);
+                     background-image: repeating-linear-gradient(90deg, rgba(0,0,0,.08) 0 1px, rgba(255,255,255,.05) 1px 2px, rgba(0,0,0,0) 2px 52px),
+                       var(--grao-v, none); }
+    .movel.inteira .corpo::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+                     box-shadow: inset 14px 0 14px -10px rgba(0,0,0,.55), inset -14px 0 14px -10px rgba(0,0,0,.55),
+                                 inset 0 14px 16px -10px rgba(0,0,0,.6); }
+    /* Cada prateleira: uma fileira de peças (120px) e a tábua embaixo (10px) */
+    .fileira { position: relative; display: flex; align-items: flex-end; gap: 4px; height: 120px; padding: 0 6px;
+               background-image: linear-gradient(to bottom, rgba(0,0,0,.42), rgba(0,0,0,0) 20px); }
+    .com-luz .fileira { height: 136px; }
+    .tabua { height: 10px; background-color: var(--m-tabua, #7a4a21);
+             background-image: linear-gradient(to bottom, rgba(255,255,255,.5) 0, rgba(255,255,255,.5) 1.5px, rgba(0,0,0,0) 1.5px, rgba(0,0,0,0) 6.5px, rgba(0,0,0,.5) 6.5px),
+                               var(--grao-h, none); }
+    .organizando .fileira { outline: 1px dashed rgba(255,255,255,.28); outline-offset: -3px; }
+
+    .livro-estante { position: relative; flex-shrink: 0; height: 120px; display: flex; align-items: flex-end; cursor: pointer; transform-origin: 50% 100%; }
+    .livro-estante svg, .livro-estante .deco-img { display: block; }
+    .livro-estante svg { overflow: visible; }
+    .capa-estante { height: 108px; width: 72px; object-fit: cover; border-radius: 1px 2px 2px 1px; box-shadow: 2px 2px 4px rgba(0,0,0,.5); }
+
+    /* Lombada e livro deitado: a cor vem da capa; o tamanho vem do título (calculado no JavaScript) */
+    .lombada, .deitado { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
+                         color: #fff; border-radius: 2px; box-shadow: 2px 2px 4px rgba(0,0,0,.5); }
+    .lombada { writing-mode: vertical-rl;
+               background-image: linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,0) 24%, rgba(0,0,0,0) 68%, rgba(0,0,0,.3)); }
+    .deitado { background-image: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 30%, rgba(0,0,0,0) 66%, rgba(0,0,0,.32)); }
+    .lombada::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+                      box-shadow: inset 2px 0 3px rgba(255,255,255,.18), inset -3px 0 5px rgba(0,0,0,.3); }
+    .deitado::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+                      box-shadow: inset 0 2px 3px rgba(255,255,255,.18), inset 0 -3px 5px rgba(0,0,0,.3); }
+    .texto-lombada { position: relative; z-index: 2; font-weight: bold; line-height: 1.3; white-space: nowrap;
+                     text-align: center; letter-spacing: .2px; text-shadow: 0 1px 2px rgba(0,0,0,.55); }
+    .filete { position: absolute; z-index: 2; background: rgba(255,255,255,.42); }
+    .lombada .filete { left: 0; right: 0; height: 2px; }
+    .deitado .filete { top: 0; bottom: 0; width: 2px; }
+    /* Plano B (quando não dá para ler a cor): a própria capa, desfocada */
+    .com-capa::before { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.38); z-index: 1; }
+    .fundo-capa { position: absolute; inset: 0; background-size: 100% 100%; background-position: center;
+                  filter: blur(4px) saturate(1.15); transform: scale(1.25); }
+
+    /* Luzes: um fio em cada prateleira; o fio e as lâmpadas são desenhos que se repetem */
+    .luz { position: absolute; left: 0; right: 0; top: 0; height: 26px; z-index: 2; pointer-events: none;
+           background-image: var(--fio); background-repeat: repeat-x; background-size: 64px 26px; }
+    .luz::before, .luz::after { content: ""; position: absolute; inset: 0; background-repeat: repeat-x; background-size: 64px 26px;
+                                animation: pisca 1.9s ease-in-out infinite; }
+    .luz::before { background-image: var(--luz-a); }
+    .luz::after { background-image: var(--luz-b); animation-delay: -.95s; }
+    @keyframes pisca { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+    /* Modo Organizar (arrastar) */
+    .organizando .livro-estante[data-chave] { cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+                                              animation: tremer .34s ease-in-out infinite alternate; }
+    .organizando .livro-estante[data-chave]:nth-child(2n) { animation-direction: alternate-reverse; animation-duration: .4s; }
+    @keyframes tremer { from { transform: rotate(-.8deg); } to { transform: rotate(.8deg); } }
+    .organizando img { -webkit-user-drag: none; }
+    .livro-estante.fantasma { opacity: .22; animation: none !important; }
+    .peca-voando { position: fixed; z-index: 70; pointer-events: none; cursor: grabbing; animation: none !important;
+                   transform: scale(1.12) rotate(-3deg); filter: drop-shadow(0 10px 8px rgba(0,0,0,.55)); }
+    body.arrastando { user-select: none; -webkit-user-select: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .luz::before, .luz::after, .organizando .livro-estante[data-chave], .chama, .vapor { animation: none !important; }
+    }
+
+    /* Botão + (enfeites): fica flutuando no canto da estante */
+    .botao-mais { position: fixed; bottom: 92px; right: max(16px, calc(50vw - 224px)); z-index: 15; width: 48px; height: 48px;
+                  border-radius: 50%; border: none; cursor: pointer; background: rgba(255,255,255,.94); color: #4a3a2a;
+                  box-shadow: 0 3px 8px rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; }
+    .botao-mais .icone { width: 24px; height: 24px; stroke-width: 2.4; }
+
+    /* Perfil */
+    .perfil { padding: 16px; }
+    .perfil label, .perfil .rotulo { display: block; margin: 0 0 6px; font-size: 13px; color: var(--suave); }
+    .perfil input, .perfil textarea, .perfil select { width: 100%; padding: 10px; border: 1px solid var(--borda); border-radius: 6px; background: var(--campo); }
+    .perfil textarea { min-height: 70px; resize: vertical; line-height: 1.45; font-style: italic; }
+    .perfil .bloco { margin-bottom: 22px; }
+    .cabeca-perfil { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 4px 0 24px; }
+    .foto { width: 112px; height: 112px; border-radius: 50%; border: 3px solid var(--borda); background: var(--campo) center / cover no-repeat;
+            display: flex; align-items: center; justify-content: center; color: var(--suave2); cursor: pointer; padding: 0; }
+    .foto .icone { width: 44px; height: 44px; }
+    .foto.com-foto .icone { display: none; }
+    .nome-perfil { margin: 0; font-size: 20px; }
+    .frase-perfil { margin: 0 16px; text-align: center; font-style: italic; color: var(--suave); font-size: 14px; }
+    .favorito { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
+    .favorito img, .favorito .sem-capa-mini { width: 54px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 3px; flex-shrink: 0; cursor: default; }
+    .favorito h4 { margin: 0 0 2px; font-size: 15px; }
+    .favorito p { margin: 0; font-size: 13px; color: var(--suave); }
+    .linha-meta { display: flex; align-items: center; gap: 10px; }
+    .linha-meta input { width: 90px; }
+    .resumo { margin-top: 8px; font-size: 15px; }
+    .resumo p { margin: 8px 0; }
+
+    /* Resumo (dashboards) */
+    .painel-dados { padding: 16px; }
+    .topo-dados { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .topo-dados h2 { margin: 0; font-size: 18px; }
+    .topo-dados select { padding: 8px; border-radius: 6px; border: 1px solid var(--borda); background: var(--campo); }
+    .cartao { background: var(--card); border: 1px solid var(--linha); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+    .cartao h3 { margin: 0 0 10px; font-size: 15px; }
+    .cartao .sub { margin: -6px 0 12px; font-size: 12px; color: var(--suave2); }
+    .meta-numeros { display: flex; align-items: baseline; gap: 6px; margin-bottom: 10px; }
+    .meta-numeros strong { font-size: 40px; line-height: 1; }
+    .meta-numeros span { color: var(--suave); font-size: 15px; }
+    .barra-meta { height: 12px; border-radius: 6px; background: var(--linha); overflow: hidden; }
+    .barra-meta div { height: 100%; border-radius: 6px; background: var(--destaque); transition: width .5s; }
+    .meta-texto { margin: 8px 0 0; font-size: 13px; color: var(--suave); }
+    .blocos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .bloco-num { background: var(--card); border: 1px solid var(--linha); border-radius: 12px; padding: 12px; }
+    .bloco-num strong { display: block; font-size: 26px; line-height: 1.1; }
+    .bloco-num span { font-size: 12px; color: var(--suave); }
+    .meses { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; align-items: end; height: 150px; padding-top: 16px;
+             border-bottom: 1px solid var(--borda); }
+    .mes { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; cursor: default; }
+    .mes .coluna { width: 100%; max-width: 20px; border-radius: 4px 4px 0 0; background: var(--destaque); min-height: 0; }
+    .mes .valor { font-size: 11px; color: var(--suave); margin-bottom: 3px; }
+    .mes.atual .coluna { box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--destaque); }
+    .rotulos-meses { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin-top: 5px; font-size: 10px; color: var(--suave2); text-align: center; }
+    .barras-h { display: flex; flex-direction: column; gap: 8px; }
+    .barra-h { display: grid; grid-template-columns: 96px 1fr 26px; align-items: center; gap: 8px; font-size: 13px; }
+    .barra-h .nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tinta); }
+    .barra-h .nome.estrelas-txt { color: var(--estrela); letter-spacing: 1px; }
+    .barra-h .trilho { height: 12px; border-radius: 0 4px 4px 0; }
+    .barra-h .trilho div { height: 100%; border-radius: 0 4px 4px 0; background: var(--destaque); min-width: 2px; }
+    .barra-h .num { text-align: right; color: var(--suave); }
+    .vazio-dados { font-size: 13px; font-style: italic; color: var(--suave2); margin: 0; }
+    .tabela-dados { margin-top: 10px; font-size: 12px; color: var(--suave); }
+    .tabela-dados summary { cursor: pointer; }
+    .tabela-dados table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    .tabela-dados td { padding: 3px 0; border-bottom: 1px solid var(--linha); }
+    .tabela-dados td:last-child { text-align: right; }
+    .dica-dados { position: fixed; z-index: 60; pointer-events: none; background: var(--tinta); color: var(--papel); font-size: 12px;
+                  padding: 6px 9px; border-radius: 6px; transform: translate(-50%, -100%); white-space: nowrap; }
+
+    /* Menu de baixo */
+    .menu { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px;
+            display: flex; background: var(--barra); border-top: 1px solid var(--linha); z-index: 20; }
+    .menu button { flex: 1; background: none; border: none; color: var(--icone); padding: 8px 0 8px;
+                   font-size: 12px; cursor: pointer; }
+    .menu button .icone { display: block; margin: 0 auto 2px; }
+    .menu button.ativo { color: var(--icone-ativo); font-weight: bold; }
+
+    /* Folha (sobe de baixo): personalizar, decorar... */
+    .fundo-folha { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 30; }
+    .folha { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px;
+             max-height: 85vh; overflow-y: auto; background: var(--papel); border-radius: 16px 16px 0 0;
+             padding: 16px; z-index: 40; animation: subir .25s ease; }
+    @keyframes subir { from { transform: translate(-50%, 40px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+    .titulo-folha { margin: 0 0 4px; font-size: 18px; }
+    .dica { margin: 0 0 12px; font-size: 13px; color: var(--suave); }
+    .rotulo { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--suave2); }
+    .grupo { display: flex; gap: 6px; }
+    .grupo button { flex: 1; padding: 10px 4px; border: 1px solid var(--borda); background: var(--campo); color: var(--tinta);
+                    border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .grupo button.ativo { background: var(--destaque); border-color: var(--destaque); color: #fff; }
+    input[type=date] { width: 100%; padding: 10px; border: 1px solid var(--borda); border-radius: 6px; background: var(--campo); }
+    .perigo { margin-top: 18px; width: 100%; padding: 10px; background: none; border: 1px solid var(--perigo); color: var(--perigo); border-radius: 6px; cursor: pointer; }
+    .fechar { margin-top: 8px; width: 100%; padding: 10px; background: none; border: none; color: var(--suave); cursor: pointer; }
+
+    /* Personalizar a estante */
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip { width: 64px; text-align: center; font-size: 11px; color: var(--suave); cursor: pointer; background: none; border: none; padding: 0; }
+    .chip .amostra-modelo { display: block; width: 64px; height: 48px; border-radius: 6px; border: 6px solid; margin-bottom: 4px; }
+    .chip .tile-papel { display: flex; align-items: center; justify-content: center; width: 64px; height: 56px;
+                        border-radius: 6px; margin-bottom: 4px; box-shadow: 0 0 0 1px var(--borda); font-size: 24px; color: var(--suave); }
+    .chip.ativo .amostra-modelo, .chip.ativo .tile-papel { box-shadow: 0 0 0 3px var(--destaque); }
+    .chip.ativo { color: var(--tinta); font-weight: bold; }
+    .linha-cor { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .linha-cor input[type=color] { width: 40px; height: 32px; padding: 0; border: 1px solid var(--borda);
+                                   border-radius: 6px; background: none; cursor: pointer; }
+    #amostras { display: flex; gap: 6px; }
+    .amostra { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid #fff;
+               box-shadow: 0 0 0 1px #b8a584; cursor: pointer; }
+    .links { display: flex; gap: 16px; margin-top: 10px; }
+    .link { background: none; border: none; padding: 0; color: var(--destaque); font-size: 13px; text-decoration: underline; cursor: pointer; }
+
+    /* Decorar a estante */
+    .opcoes-deco { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .opcao-deco { background: var(--campo); border: 1px solid var(--borda); border-radius: 10px; padding: 10px 2px 8px;
+                  cursor: pointer; color: var(--tinta); font-size: 12px; display: flex; flex-direction: column;
+                  align-items: center; gap: 6px; }
+    .opcao-deco .fig { height: 56px; display: flex; align-items: flex-end; }
+    .opcao-deco svg { height: 56px; width: auto; }
+
+    /* Aviso rapidinho */
+    .aviso { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--tinta);
+             color: var(--papel); padding: 10px 16px; border-radius: 20px; font-size: 13px; opacity: 0;
+             pointer-events: none; transition: opacity .25s; z-index: 50; }
+    .aviso.visivel { opacity: 1; }
+
+    /* ===== Ajustes novos (ficam depois dos antigos para valer por cima) ===== */
+    .botoes-estante { display: flex; gap: 6px; }
+    .botao-personalizar.ativo-org { background: #b3541e; }
+    .faixa-organizar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px;
+                       padding: 8px 10px; border-radius: 8px; background: var(--campo); font-size: 12px; color: var(--suave); }
+    .faixa-organizar .link { flex-shrink: 0; }
+    .grupo.quebra { flex-wrap: wrap; }
+    .grupo.quebra button { flex: 1 0 28%; }
+    .chip .amostra-modelo { background-size: 110px 110px; }
+    .opcao-deco .fig { height: 68px; align-items: flex-end; justify-content: center; }
+    .opcao-deco svg, .opcao-deco img { height: 68px; width: auto; max-width: 100%; }
+    .opcao-deco .mais-deco { width: 44px; height: 44px; margin-bottom: 8px; border-radius: 50%; border: 2px dashed var(--borda);
+                             display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--suave); }
+    /* Chama da vela e vapor da xícara */
+    .chama { transform-box: fill-box; transform-origin: 50% 100%; animation: chama .8s ease-in-out infinite alternate; }
+    @keyframes chama { from { transform: scale(1, 1) skewX(-2deg); } to { transform: scale(.92, 1.08) skewX(3deg); } }
+    .vapor { animation: vapor 3.2s ease-in-out infinite; }
+    @keyframes vapor { 0%, 100% { opacity: .15; transform: translateY(1px); } 50% { opacity: .6; transform: translateY(-2px); } }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topo">
+    <div class="topo-esq">
+      <button class="voltar" id="botaoVoltar" hidden aria-label="Voltar" onclick="voltar()">
+        <svg class="icone" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <h1 id="tituloTopo">Início</h1>
+    </div>
+    <button class="lupa" id="botaoLupa" aria-label="Buscar livros">
+      <svg class="icone" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+    </button>
+  </header>
+
+  <!-- Painel de busca: começa escondido -->
+  <section class="painel-busca" id="painelBusca" hidden>
+    <div class="linha-busca">
+      <input type="search" id="campoBusca" placeholder="Título ou autor">
+      <button class="botao" id="botaoBuscar">Buscar</button>
+    </div>
+    <div class="opcoes-busca">
+      <select id="tipoBusca">
+        <option value="">Tudo</option>
+        <option value="intitle:">Título</option>
+        <option value="inauthor:">Autor</option>
+      </select>
+      <label><input type="checkbox" id="soPortugues"> Só em português</label>
+    </div>
+    <div id="resultados"></div>
+  </section>
+
+  <!-- ABA: Início -->
+  <main class="aba ativa" id="aba-inicio"></main>
+
+  <!-- PÁGINA: todos os livros de uma categoria (abre pela seta do Início) -->
+  <main class="aba" id="aba-lista"></main>
+
+  <!-- PÁGINA: um livro (nota, anotações...) -->
+  <main class="aba" id="aba-livro"></main>
+
+  <!-- ABA: Estante -->
+  <main class="aba" id="aba-estante">
+    <div class="parede" id="parede">
+      <div class="painel-estante">
+        <div class="filtros">
+          <select id="filtroAno" onchange="desenharEstante()"></select>
+          <select id="filtroMes" onchange="desenharEstante()">
+            <option value="">Todos os meses</option>
+            <option value="01">Janeiro</option><option value="02">Fevereiro</option>
+            <option value="03">Março</option><option value="04">Abril</option>
+            <option value="05">Maio</option><option value="06">Junho</option>
+            <option value="07">Julho</option><option value="08">Agosto</option>
+            <option value="09">Setembro</option><option value="10">Outubro</option>
+            <option value="11">Novembro</option><option value="12">Dezembro</option>
+          </select>
+        </div>
+        <div class="linha-contagem">
+          <p class="contagem" id="contagem"></p>
+          <div class="botoes-estante">
+            <button class="botao-personalizar" id="botaoOrganizar" onclick="alternarOrganizar()">
+              <svg class="icone" viewBox="0 0 24 24"><path d="M12 3v18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12h18M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>
+              <span id="textoOrganizar">Organizar</span>
+            </button>
+            <button class="botao-personalizar" onclick="abrirPersonalizar()">
+              <svg class="icone" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+              Personalizar
+            </button>
+          </div>
+        </div>
+        <div class="faixa-organizar" id="faixaOrganizar" hidden>
+          <span>Segure um livro ou enfeite e arraste para qualquer prateleira.</span>
+          <button class="link" id="botaoPorData" onclick="ordenarPorData()">Arrumar por data</button>
+        </div>
+      </div>
+      <div id="estantes"></div>
+      <div class="pontos" id="pontos"></div>
+      <button class="botao-mais" id="botaoMais" onclick="abrirDecorar()" aria-label="Colocar um enfeite na estante">
+        <svg class="icone" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+  </main>
+
+  <!-- ABA: Perfil -->
+  <main class="aba" id="aba-resumo"></main>
+
+  <!-- ABA: Perfil -->
+  <main class="aba" id="aba-perfil">
+    <div class="perfil">
+      <div class="cabeca-perfil">
+        <button class="foto" id="foto" onclick="$('arquivoFoto').click()" aria-label="Escolher sua foto">
+          <svg class="icone" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        </button>
+        <div class="links" id="linksFoto"></div>
+        <h2 class="nome-perfil" id="nomePerfil"></h2>
+        <p class="frase-perfil" id="frasePerfil"></p>
+      </div>
+      <div class="bloco">
+        <label for="campoNome">Seu nome</label>
+        <input type="text" id="campoNome" placeholder="Como você quer ser chamado(a)?">
+      </div>
+      <div class="bloco">
+        <label for="campoMeta">Minha meta de leitura em <span id="anoMeta"></span></label>
+        <div class="linha-meta">
+          <input type="number" id="campoMeta" min="0" max="999" inputmode="numeric" placeholder="Ex.: 24">
+          <span class="dica" style="margin:0">livros no ano</span>
+        </div>
+      </div>
+      <div class="bloco">
+        <label for="campoFrase">Minha frase favorita</label>
+        <textarea id="campoFrase" placeholder="Uma frase de livro que você ama..."></textarea>
+      </div>
+      <div class="bloco">
+        <label for="campoFavorito">Meu livro favorito</label>
+        <select id="campoFavorito"></select>
+        <div id="mostraFavorito"></div>
+      </div>
+      <div class="bloco">
+        <p class="rotulo">Aparência</p>
+        <div class="grupo" id="botoesTema">
+          <button data-tema="claro" onclick="escolherTema('claro')">☀️ Claro</button>
+          <button data-tema="escuro" onclick="escolherTema('escuro')">🌙 Escuro</button>
+          <button data-tema="auto" onclick="escolherTema('auto')">Automático</button>
+        </div>
+      </div>
+      <div class="resumo" id="resumo"></div>
+    </div>
+  </main>
+
+</div>
+
+<!-- Menu de baixo -->
+<nav class="menu">
+  <button class="ativo" data-aba="inicio" onclick="mostrarAba('inicio')">
+    <svg class="icone" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>
+    Início
+  </button>
+  <button data-aba="estante" onclick="mostrarAba('estante')">
+    <svg class="icone" viewBox="0 0 24 24"><rect x="3" y="3" width="4" height="15" rx="1"/><rect x="9" y="3" width="4" height="15" rx="1"/><path d="M15 5l3.5-1 3 13-3.5 1z"/><path d="M2 21h20"/></svg>
+    Estante
+  </button>
+  <button data-aba="resumo" onclick="mostrarAba('resumo')">
+    <svg class="icone" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+    Resumo
+  </button>
+  <button data-aba="perfil" onclick="mostrarAba('perfil')">
+    <svg class="icone" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+    Perfil
+  </button>
+</nav>
+
+<!-- Folha, aviso e seletor de arquivo (para o papel de parede próprio) -->
+<div class="fundo-folha" id="fundoFolha" hidden onclick="fecharFolha()"></div>
+<div class="folha" id="folha" hidden></div>
+<div class="aviso" id="aviso"></div>
+<input type="file" id="arquivoPapel" accept="image/*" hidden>
+<input type="file" id="arquivoDeco" accept="image/*" hidden>
+<input type="file" id="arquivoFoto" accept="image/*" hidden>
+<div class="dica-dados" id="dicaDados" hidden></div>
+
+<script>
+  const CHAVE_API = "AIzaSyAMIlC0YZLmXNRmf1liMnRA72S-K9QqSxI";
+</script>
+
+<script>
+  // ====== CONFIGURAÇÕES (mexa aqui) ======
+  const NOMES = { lendo: "Lendo agora", quero: "Próximas leituras", lido: "Lidos" };
+  const ICONES = { lendo: "📖", quero: "🔖", lido: "✅" };
+  const TITULOS_ABAS = { inicio: "Início", estante: "Minha estante", resumo: "Meu resumo", perfil: "Perfil" };
+  const MAX_NO_INICIO = 4;   // quantas capas aparecem no Início antes da seta
+  const CORES_PAREDE = ["#2f5d4e", "#27425e", "#6b2d3c", "#8c7b66", "#2b2623", "#c9b79c"];
+
+  // Modelos de madeira (moldura = madeira de fora, fundo = parte de dentro, tabua = prateleira, grao = força da textura)
+  const MODELOS = {
+    classica: { nome: "Clássica", moldura: "#7a3f1d", fundo: "#a6683a", tabua: "#8a4f26", grao: 0.5,  graoCor: [0.16, 0.06, 0.02] },
+    nogueira: { nome: "Nogueira", moldura: "#3d2516", fundo: "#583826", tabua: "#47291a", grao: 0.55, graoCor: [0.04, 0.02, 0.01] },
+    carvalho: { nome: "Carvalho", moldura: "#c8a06a", fundo: "#e3caa0", tabua: "#c9a068", grao: 0.4,  graoCor: [0.35, 0.2, 0.08] },
+    rustica:  { nome: "Rústica",  moldura: "#8a8274", fundo: "#a8a090", tabua: "#948c7c", grao: 0.5,  graoCor: [0.2, 0.18, 0.14] },
+    branca:   { nome: "Branca",   moldura: "#f3efe8", fundo: "#e6e0d4", tabua: "#faf7f2", grao: 0.07, graoCor: [0.3, 0.28, 0.25] },
+    preta:    { nome: "Preta",    moldura: "#212124", fundo: "#2e2e32", tabua: "#18181a", grao: 0.12, graoCor: [1, 1, 1] }
+  };
+
+  // Textura de veios de madeira (ruído esticado): "h" = veios deitados, "v" = veios em pé
+  function graoSvg(direcao, m) {
+    const freq = direcao === "h" ? "0.012 0.5" : "0.5 0.012";
+    const k = (m.grao * 3.2).toFixed(2), b = (-m.grao * 1.2).toFixed(2);
+    const [r, g, bl] = m.graoCor;
+    return ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'>
+      <filter id='f' x='0' y='0' width='100%' height='100%'>
+        <feTurbulence type='fractalNoise' baseFrequency='${freq}' numOctaves='3' seed='7' stitchTiles='stitch'/>
+        <feColorMatrix values='0 0 0 0 ${r}  0 0 0 0 ${g}  0 0 0 0 ${bl}  ${k} 0 0 0 ${b}'/>
+      </filter><rect width='100%' height='100%' filter='url(#f)'/></svg>`);
+  }
+
+  // Fio e lâmpadas das luzes (3 desenhos: o fio, as lâmpadas A e as lâmpadas B, que piscam alternadas)
+  const LUZES = {
+    nenhuma:   { nome: "Sem luzes" },
+    quentes:   { nome: "Quentes",   forma: "bulbo",    cores: ["#ffd27a", "#ffc25c"] },
+    brancas:   { nome: "Brancas",   forma: "bulbo",    cores: ["#f4fbff", "#dcefff"] },
+    coloridas: { nome: "Coloridas", forma: "bulbo",    cores: ["#ff5e6c", "#ffd45e", "#5ee08a", "#5eb6ff", "#c08bff", "#ff9a5e"] },
+    estrelas:  { nome: "Estrelas",  forma: "estrela",  cores: ["#ffe08a", "#fff3c4"] },
+    coracoes:  { nome: "Corações",  forma: "coracao",  cores: ["#ff7fa0", "#ffb0c4"] },
+    bolas:     { nome: "Bolas",     forma: "bola",     cores: ["#ffd9e0", "#fff1c9", "#d9f0ff", "#e3d9ff"] },
+    lanternas: { nome: "Lanternas", forma: "lanterna", cores: ["#ff8a5c", "#ffc85c", "#ff6f7d", "#ffe08a"] }
+  };
+
+  function desenhosLuzes(tipo) {
+    const L = LUZES[tipo] || LUZES.quentes;
+    const pontos = L.forma === "bulbo"
+      ? [[8, 10.1], [16, 12.5], [24, 10.1], [40, 10.1], [48, 12.5], [56, 10.1]]
+      : [[8, 10.1], [24, 10.1], [40, 10.1], [56, 10.1]];
+    const moldura = (miolo) => ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='64' height='26'>${miolo}</svg>`);
+    const n = (v) => v.toFixed(1);
+
+    const forma = (x, y, cor) => {
+      const cy = y + (L.forma === "bulbo" ? 3.6 : 5);
+      const brilho = `<circle cx='${x}' cy='${n(cy)}' r='7' fill='${cor}' fill-opacity='.22'/>`;
+      if (L.forma === "estrela") {
+        const p = Array.from({ length: 10 }, (_, i) => { const r = i % 2 ? 2 : 4.6, a = i * Math.PI / 5;
+          return n(x + r * Math.sin(a)) + " " + n(cy - r * Math.cos(a)); }).join("L");
+        return brilho + `<path d='M${p}Z' fill='${cor}'/>`;
+      }
+      if (L.forma === "coracao") {
+        return brilho + `<path d='M${x} ${n(cy + 3.8)}C${x - 6} ${n(cy - 0.4)} ${x - 2.6} ${n(cy - 4.6)} ${x} ${n(cy - 1.6)}C${x + 2.6} ${n(cy - 4.6)} ${x + 6} ${n(cy - 0.4)} ${x} ${n(cy + 3.8)}Z' fill='${cor}'/>`;
+      }
+      if (L.forma === "bola") {
+        return brilho + `<circle cx='${x}' cy='${n(cy)}' r='4.4' fill='${cor}'/><circle cx='${x - 1.4}' cy='${n(cy - 1.4)}' r='1.3' fill='#fff' fill-opacity='.8'/>`;
+      }
+      if (L.forma === "lanterna") {
+        return brilho + `<rect x='${x - 3}' y='${n(cy - 3.6)}' width='6' height='7.6' rx='2.4' fill='${cor}'/>`
+          + `<rect x='${x - 2}' y='${n(cy - 4.4)}' width='4' height='1.2' fill='#3a2a1a'/><rect x='${x - 2}' y='${n(cy + 3.6)}' width='4' height='1.2' fill='#3a2a1a'/>`
+          + `<path d='M${x} ${n(cy - 3.2)}V${n(cy + 3.6)}' stroke='#fff' stroke-opacity='.45' stroke-width='.8'/>`;
+      }
+      return brilho + `<circle cx='${x}' cy='${n(cy)}' r='4.4' fill='${cor}' fill-opacity='.35'/><circle cx='${x}' cy='${n(cy)}' r='2.5' fill='${cor}'/>`
+        + `<circle cx='${x - 0.7}' cy='${n(cy - 0.8)}' r='.8' fill='#fff' fill-opacity='.85'/>`;
+    };
+
+    const fio = moldura(
+      `<path d='M0 3Q16 22 32 3Q48 22 64 3' fill='none' stroke='#1d1710' stroke-opacity='.85' stroke-width='1.1'/>`
+      + pontos.map(([x, y]) => `<rect x='${x - 1}' y='${y - 0.6}' width='2' height='2.4' rx='.5' fill='#1d1710'/>`).join(""));
+    const lampadas = (grupo) => moldura(pontos.map(([x, y], i) => i % 2 !== grupo ? "" : forma(x, y, L.cores[i % L.cores.length])).join(""));
+    return { fio: fio, a: lampadas(0), b: lampadas(1) };
+  }
+
+  // Papéis de parede: desenhos suaves que ficam por cima da cor escolhida
+  function ladrilho(svg) {
+    return "url(data:image/svg+xml," + encodeURIComponent(svg)
+      .replace(/'/g, "%27").replace(/\(/g, "%28").replace(/\)/g, "%29") + ")";
+  }
+  const PAPEIS = {
+    liso:      { nome: "Liso", imagem: "none", tamanho: "auto" },
+    listras:   { nome: "Listras", tamanho: "auto",
+                 imagem: "repeating-linear-gradient(90deg, rgba(255,255,255,.09) 0 16px, rgba(0,0,0,.09) 16px 32px)" },
+    bolinhas:  { nome: "Bolinhas", tamanho: "24px 24px",
+                 imagem: "radial-gradient(circle, rgba(255,255,255,.18) 3px, transparent 3.6px)" },
+    floral:    { nome: "Floral", tamanho: "60px 60px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'>
+                   <g fill='none' stroke='#fff' stroke-opacity='.24' stroke-width='1.4'>
+                     <path d='M30 6C36 16 36 22 30 30C24 22 24 16 30 6Z'/><path d='M30 54C36 44 36 38 30 30C24 38 24 44 30 54Z'/>
+                     <path d='M6 30C16 24 22 24 30 30C22 36 16 36 6 30Z'/><path d='M54 30C44 24 38 24 30 30C38 36 44 36 54 30Z'/>
+                     <circle cx='30' cy='30' r='3'/></g>
+                   <g fill='#000' fill-opacity='.12'><circle cx='0' cy='0' r='4'/><circle cx='60' cy='0' r='4'/>
+                     <circle cx='0' cy='60' r='4'/><circle cx='60' cy='60' r='4'/></g></svg>`) },
+    tijolinho: { nome: "Tijolinho", tamanho: "48px 24px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='48' height='24' viewBox='0 0 48 24'>
+                   <path d='M0 0H48M0 12H48M0 24H48M0 0V12M24 0V12M12 12V24M36 12V24' fill='none' stroke='#000' stroke-opacity='.25' stroke-width='1.6'/></svg>`) },
+    lambri:    { nome: "Madeira", tamanho: "auto",
+                 imagem: "repeating-linear-gradient(90deg, rgba(0,0,0,.22) 0 2px, rgba(255,255,255,.06) 2px 3px, rgba(0,0,0,.04) 3px 34px)" },
+    losangos:  { nome: "Losangos", tamanho: "40px 40px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'>
+                   <path d='M20 0L40 20L20 40L0 20Z' fill='none' stroke='#fff' stroke-opacity='.2' stroke-width='1.5'/></svg>`) },
+
+    // ----- novos -----
+    quadriculado: { nome: "Quadriculado", tamanho: "24px 24px",
+                 imagem: "linear-gradient(rgba(255,255,255,.17) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.17) 1px, transparent 1px)" },
+    xadrez:    { nome: "Xadrez", tamanho: "auto",
+                 imagem: "repeating-linear-gradient(0deg, rgba(255,255,255,.12) 0 14px, transparent 14px 28px), repeating-linear-gradient(90deg, rgba(255,255,255,.12) 0 14px, transparent 14px 28px)" },
+    escoces:   { nome: "Escocês", tamanho: "72px 72px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='72' height='72'>
+                   <rect x='6' width='18' height='72' fill='#000' fill-opacity='.2'/><rect y='6' width='72' height='18' fill='#000' fill-opacity='.2'/>
+                   <rect x='40' width='2' height='72' fill='#fff' fill-opacity='.22'/><rect y='40' width='72' height='2' fill='#fff' fill-opacity='.22'/>
+                   <rect x='52' width='1' height='72' fill='#fff' fill-opacity='.14'/><rect y='52' width='72' height='1' fill='#fff' fill-opacity='.14'/></svg>`) },
+    tabuleiro: { nome: "Tabuleiro", tamanho: "64px 64px",
+                 imagem: "conic-gradient(rgba(0,0,0,.16) 25%, transparent 0 50%, rgba(0,0,0,.16) 0 75%, transparent 0)" },
+    diagonal:  { nome: "Diagonal", tamanho: "auto",
+                 imagem: "repeating-linear-gradient(45deg, rgba(255,255,255,.09) 0 10px, rgba(0,0,0,.09) 10px 20px)" },
+    damasco:   { nome: "Damasco", tamanho: "64px 96px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='64' height='96' viewBox='0 0 64 96'>
+                   <path d='M32 8C40 22 50 26 50 40C50 52 42 56 32 68C22 56 14 52 14 40C14 26 24 22 32 8Z' fill='#fff' fill-opacity='.13' stroke='#fff' stroke-opacity='.22'/>
+                   <g fill='none' stroke='#fff' stroke-opacity='.22' stroke-width='1.2'>
+                     <path d='M32 20C36 28 40 30 40 38C40 44 36 46 32 52C28 46 24 44 24 38C24 30 28 28 32 20Z'/><circle cx='32' cy='40' r='3'/>
+                     <path d='M0 74C10 74 14 82 14 90M64 74C54 74 50 82 50 90M32 68V80'/></g>
+                   <path d='M0 56L6 48L12 56L6 64ZM64 56L58 48L52 56L58 64Z' fill='#fff' fill-opacity='.14'/></svg>`) },
+    folhas:    { nome: "Folhas", tamanho: "64px 64px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'>
+                   <g fill='#fff' fill-opacity='.13'><path d='M10 54C8 40 18 30 32 28C34 42 24 52 10 54Z'/><path d='M54 10C56 24 46 34 32 36C30 22 40 12 54 10Z'/></g>
+                   <g fill='none' stroke='#fff' stroke-opacity='.24' stroke-width='1.2' stroke-linecap='round'>
+                     <path d='M10 54C18 46 24 38 32 28'/><path d='M54 10C46 18 40 26 32 36'/></g></svg>`) },
+    estrelas:  { nome: "Estrelas", tamanho: "56px 56px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'>
+                   <g fill='#fff' fill-opacity='.32'>
+                     <path d='M14 4L16.2 11.8L24 14L16.2 16.2L14 24L11.8 16.2L4 14L11.8 11.8Z'/>
+                     <path d='M42 34L43.3 38.7L48 40L43.3 41.3L42 46L40.7 41.3L36 40L40.7 38.7Z'/>
+                     <circle cx='40' cy='10' r='1'/><circle cx='8' cy='44' r='1'/><circle cx='28' cy='30' r='.8'/></g></svg>`) },
+    circulos:  { nome: "Círculos", tamanho: "40px 40px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'>
+                   <g fill='none' stroke='#fff' stroke-opacity='.2' stroke-width='1.3'>
+                     <circle cx='0' cy='0' r='20'/><circle cx='40' cy='0' r='20'/><circle cx='0' cy='40' r='20'/><circle cx='40' cy='40' r='20'/><circle cx='20' cy='20' r='20'/></g></svg>`) },
+    favos:     { nome: "Favos", tamanho: "28px 50px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='56' height='100' viewBox='0 0 56 100'>
+                   <g fill='none' stroke='#fff' stroke-opacity='.2' stroke-width='1.6'>
+                     <path d='M28 66L0 50L0 16L28 0L56 16L56 50L28 66L28 100'/><path d='M28 0L28 34L0 50L0 84L28 100L56 84L56 50L28 34'/></g></svg>`) },
+    artdeco:   { nome: "Art déco", tamanho: "40px 20px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='40' height='20' viewBox='0 0 40 20'>
+                   <g fill='none' stroke='#fff' stroke-opacity='.22' stroke-width='1.2'>
+                     <path d='M0 20A20 20 0 0 1 40 20'/><path d='M6 20A14 14 0 0 1 34 20'/><path d='M12 20A8 8 0 0 1 28 20'/>
+                     <path d='M-20 10A20 20 0 0 1 20 10'/><path d='M-14 10A14 14 0 0 1 14 10'/><path d='M-8 10A8 8 0 0 1 8 10'/>
+                     <path d='M20 10A20 20 0 0 1 60 10'/><path d='M26 10A14 14 0 0 1 54 10'/><path d='M32 10A8 8 0 0 1 48 10'/></g></svg>`) },
+    ziguezague:{ nome: "Zigue-zague", tamanho: "40px 16px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='40' height='16' viewBox='0 0 40 16'>
+                   <path d='M0 3L20 13L40 3' fill='none' stroke='#fff' stroke-opacity='.22' stroke-width='1.7'/></svg>`) },
+    linho:     { nome: "Linho", tamanho: "160px 160px",
+                 imagem: ladrilho(`<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'>
+                   <filter id='a'><feTurbulence type='fractalNoise' baseFrequency='.9 .04' numOctaves='2' seed='3' stitchTiles='stitch'/>
+                     <feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.1 0 0 0 -.35'/></filter>
+                   <filter id='b'><feTurbulence type='fractalNoise' baseFrequency='.04 .9' numOctaves='2' seed='8' stitchTiles='stitch'/>
+                     <feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.1 0 0 0 -.35'/></filter>
+                   <rect width='160' height='160' filter='url(#a)' opacity='.55'/><rect width='160' height='160' filter='url(#b)' opacity='.55'/></svg>`) },
+    degrade:   { nome: "Degradê", tamanho: "100% 100%",
+                 imagem: "linear-gradient(to bottom, rgba(0,0,0,.4), rgba(255,255,255,.1))" },
+    bokeh:     { nome: "Luzinhas", tamanho: "220px 220px",
+                 imagem: "radial-gradient(circle at 18% 22%, rgba(255,214,140,.30) 0 16px, transparent 17px), radial-gradient(circle at 70% 14%, rgba(255,214,140,.22) 0 26px, transparent 27px), radial-gradient(circle at 42% 58%, rgba(255,255,255,.16) 0 12px, transparent 13px), radial-gradient(circle at 86% 66%, rgba(255,214,140,.26) 0 20px, transparent 21px), radial-gradient(circle at 24% 86%, rgba(255,255,255,.14) 0 30px, transparent 31px)" }
+  };
+
+  // Enfeites para a estante: desenhos em SVG com degradês, sombra e brilho (w e h = tamanho do desenho).
+  // O "__" no nome dos degradês vira um prefixo único em cada desenho, para um não atrapalhar o outro.
+  const lg = (id, paradas, vertical) =>
+    `<linearGradient id="__${id}" ${vertical ? 'x1="0" y1="0" x2="0" y2="1"' : 'x1="0" y1="0" x2="1" y2="0"'}>`
+    + paradas.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join("") + `</linearGradient>`;
+  const SOMBRA = `<radialGradient id="__s"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>`;
+  const MADEIRA = lg("w", [[0, "#5a3a1e"], [0.4, "#b07a42"], [0.75, "#6e4623"], [1, "#462c16"]]);
+  const LATAO = lg("l", [[0, "#8a6a2a"], [0.45, "#f2d680"], [1, "#8a6a2a"]]);
+
+  const folhaEspada = (x, y, comp, ang, larg) =>
+    `<g transform="translate(${x} ${y}) rotate(${ang})">`
+    + `<path d="M0 0C${-larg} ${-comp * 0.25} ${-larg} ${-comp * 0.68} 0 ${-comp}C${larg} ${-comp * 0.68} ${larg} ${-comp * 0.25} 0 0Z" fill="url(#__f)" stroke="#cfdc7a" stroke-opacity=".75" stroke-width=".8"/>`
+    + `<path d="M0 -3C${-larg * 0.3} ${-comp * 0.3} ${-larg * 0.25} ${-comp * 0.62} 0 ${-comp * 0.92}" fill="none" stroke="#a6d98f" stroke-opacity=".5" stroke-width="1.1"/></g>`;
+
+  const marcasRelogio = (cx, cy, r1, r2) => Array.from({ length: 12 }, (_, i) => {
+    const a = i * Math.PI / 6, s = Math.sin(a), c = Math.cos(a);
+    return `<line x1="${(cx + r1 * s).toFixed(1)}" y1="${(cy - r1 * c).toFixed(1)}" x2="${(cx + r2 * s).toFixed(1)}" y2="${(cy - r2 * c).toFixed(1)}"/>`;
+  }).join("");
+
+  const petalas = (cx, cy) => [0, 72, 144, 216, 288].map(a =>
+    `<ellipse cx="${cx}" cy="${cy - 3.2}" rx="1.9" ry="3.2" fill="#f0709f" transform="rotate(${a} ${cx} ${cy})"/>`).join("")
+    + `<circle cx="${cx}" cy="${cy}" r="1.7" fill="#ffd54a"/>`;
+
+  const DECORACOES = {
+    planta: { nome: "Planta", w: 54, h: 94, svg:
+      `<defs>${lg("f", [[0, "#1b4d2e"], [0.5, "#41a05d"], [1, "#1f5a36"]])}${lg("v", [[0, "#a9552f"], [0.4, "#e48f64"], [0.8, "#b4603a"], [1, "#8a4224"]])}${SOMBRA}</defs>`
+      + `<ellipse cx="27" cy="91" rx="22" ry="3.4" fill="url(#__s)"/>`
+      + `<path d="M12 66H42L38.5 88Q27 92 15.5 88Z" fill="url(#__v)"/>`
+      + `<path d="M13 71H41" stroke="#000" stroke-opacity=".12"/>`
+      + `<rect x="9" y="58" width="36" height="10" rx="2.4" fill="url(#__v)"/>`
+      + `<rect x="9" y="58" width="36" height="2.4" rx="1.2" fill="#fff" opacity=".25"/>`
+      + `<ellipse cx="27" cy="59.5" rx="16" ry="2.6" fill="#33231a"/>`
+      + folhaEspada(27, 60, 30, -58, 5.5) + folhaEspada(27, 60, 28, 56, 5.5)
+      + folhaEspada(27, 60, 40, -36, 6) + folhaEspada(27, 60, 38, 34, 6)
+      + folhaEspada(27, 60, 48, -17, 6.5) + folhaEspada(27, 60, 46, 15, 6.5)
+      + folhaEspada(27, 60, 56, -2, 7) },
+
+    cacto: { nome: "Cacto", w: 48, h: 88, svg:
+      `<defs>${lg("c", [[0, "#245f38"], [0.4, "#62b57c"], [0.7, "#37854f"], [1, "#1f5532"]])}${lg("p", [[0, "#cfc3aa"], [0.4, "#faf4e6"], [1, "#c9bda3"]])}${SOMBRA}</defs>`
+      + `<ellipse cx="24" cy="85" rx="19" ry="3" fill="url(#__s)"/>`
+      + `<path d="M15 50H10.5Q6.5 50 6.5 46V35" fill="none" stroke="#2c7243" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>`
+      + `<path d="M13.5 50H10Q7.8 50 7.8 46V35" fill="none" stroke="#63b87d" stroke-opacity=".55" stroke-width="2.4" stroke-linecap="round"/>`
+      + `<path d="M33 40H37.5Q41.5 40 41.5 36V26" fill="none" stroke="#2c7243" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>`
+      + `<path d="M34.5 40H38Q40.2 40 40.2 36V26" fill="none" stroke="#63b87d" stroke-opacity=".5" stroke-width="2.4" stroke-linecap="round"/>`
+      + `<rect x="15" y="14" width="18" height="52" rx="9" fill="url(#__c)"/>`
+      + `<path d="M20 18V62M24 16V62M28 18V62" stroke="#17482a" stroke-opacity=".45" stroke-width=".9" fill="none"/>`
+      + `<g stroke="#f6f1d6" stroke-width=".9" stroke-linecap="round" fill="none">`
+      +   `<path d="M17 28l-2-1M31 34l2-1M17 44l-2 1M31 52l2 1M24 24v-2M20 36l-2-1M28 42l2-1M24 54v2M5 36l-2-1M8 30l-1-2M42 28l2-1M39 32l1-2"/></g>`
+      + petalas(24, 12)
+      + `<path d="M12 62H36L33.5 82Q24 86.5 14.5 82Z" fill="url(#__p)"/>`
+      + `<rect x="10" y="57" width="28" height="8" rx="2.2" fill="url(#__p)"/>`
+      + `<rect x="10" y="57" width="28" height="2.2" rx="1.1" fill="#fff" opacity=".6"/>`
+      + `<rect x="14" y="71" width="20" height="2.4" fill="#c4704a" opacity=".75"/>` },
+
+    abajur: { nome: "Abajur", w: 52, h: 98, svg:
+      `<defs><radialGradient id="__g"><stop offset="0" stop-color="#ffe7a0" stop-opacity=".6"/><stop offset="1" stop-color="#ffe7a0" stop-opacity="0"/></radialGradient>`
+      + `${lg("a", [[0, "#d9b86a"], [0.5, "#fff0c0"], [1, "#d4b062"]])}${lg("b", [[0, "#1f5560"], [0.4, "#3f8d9b"], [1, "#1b4852"]])}${LATAO}${SOMBRA}</defs>`
+      + `<circle cx="26" cy="30" r="26" fill="url(#__g)"/>`
+      + `<ellipse cx="26" cy="95" rx="18" ry="3" fill="url(#__s)"/>`
+      + `<rect x="24" y="46" width="4" height="30" fill="url(#__l)"/>`
+      + `<path d="M12 96C11 82 15 74 26 74S41 82 40 96Z" fill="url(#__b)"/>`
+      + `<path d="M19.5 79C17.5 85 17.5 90 18.5 94" stroke="#fff" stroke-opacity=".28" stroke-width="2" fill="none" stroke-linecap="round"/>`
+      + `<ellipse cx="26" cy="74" rx="6.5" ry="1.8" fill="url(#__l)"/>`
+      + `<path d="M8 46L16 8H36L44 46Z" fill="url(#__a)"/>`
+      + `<ellipse cx="26" cy="8" rx="10" ry="2.4" fill="#e9d08c"/>`
+      + `<ellipse cx="26" cy="46" rx="18" ry="3.6" fill="#fff6d2" opacity=".9"/>`
+      + `<ellipse cx="26" cy="46" rx="7" ry="1.6" fill="#fff" opacity=".85"/>` },
+
+    vela: { nome: "Vela", w: 38, h: 62, svg:
+      `<defs><radialGradient id="__g"><stop offset="0" stop-color="#ffcf6a" stop-opacity=".55"/><stop offset="1" stop-color="#ffcf6a" stop-opacity="0"/></radialGradient>`
+      + `${lg("w", [[0, "#e4d6b8"], [0.4, "#fff8e6"], [1, "#d6c4a0"]])}${lg("fl", [[0, "#ffe27a"], [0.6, "#ff9f33"], [1, "#ff7a1f"]], true)}${LATAO}${SOMBRA}</defs>`
+      + `<circle cx="19" cy="13" r="16" fill="url(#__g)"/>`
+      + `<ellipse cx="19" cy="59" rx="16" ry="2.6" fill="url(#__s)"/>`
+      + `<path d="M5 58Q5 54 11 54H27Q33 54 33 58Z" fill="url(#__l)"/>`
+      + `<ellipse cx="19" cy="54" rx="9.5" ry="1.8" fill="#d8b45c"/>`
+      + `<rect x="13" y="22" width="12" height="33" rx="1.6" fill="url(#__w)"/>`
+      + `<ellipse cx="19" cy="22" rx="6" ry="1.9" fill="#fff4da"/><ellipse cx="19" cy="22.4" rx="2.6" ry=".9" fill="#d9c08a"/>`
+      + `<path d="M25 22V30Q25 33 23.4 30V24Z" fill="#fff0d0"/>`
+      + `<rect x="18.6" y="17.5" width=".9" height="5" fill="#2b1d12"/>`
+      + `<g class="chama"><path d="M19 3C23.5 9 23.5 14.5 19 18C14.5 14.5 14.5 9 19 3Z" fill="url(#__fl)"/>`
+      +   `<path d="M19 9C21 12 21 15 19 17C17 15 17 12 19 9Z" fill="#fff6c8"/></g>` },
+
+    globo: { nome: "Globo", w: 62, h: 96, svg:
+      `<defs><radialGradient id="__o" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="#7cc3e0"/><stop offset=".5" stop-color="#3a86ad"/><stop offset="1" stop-color="#1b4f73"/></radialGradient>`
+      + `<radialGradient id="__d" cx=".35" cy=".3" r=".8"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".5"/></radialGradient>`
+      + `<clipPath id="__k"><circle cx="31" cy="35" r="26"/></clipPath>${MADEIRA}${LATAO}${SOMBRA}</defs>`
+      + `<ellipse cx="31" cy="93" rx="23" ry="3" fill="url(#__s)"/>`
+      + `<path d="M12 89.5V92Q31 98 50 92V89.5Z" fill="url(#__w)"/><ellipse cx="31" cy="89.5" rx="19" ry="4.2" fill="url(#__w)"/>`
+      + `<rect x="28" y="64" width="6" height="25" fill="url(#__w)"/><ellipse cx="31" cy="72" rx="5.8" ry="1.6" fill="url(#__l)"/>`
+      + `<circle cx="31" cy="35" r="26" fill="url(#__o)"/>`
+      + `<g clip-path="url(#__k)" fill="#c9b072" stroke="#8a7a3c" stroke-width=".5">`
+      +   `<path d="M14 20C20 12 30 12 34 18C36 24 30 26 26 30C22 34 24 40 20 44C14 40 10 28 14 20Z"/>`
+      +   `<path d="M40 22C46 18 54 22 56 30C56 38 50 40 46 46C42 42 44 34 40 30Z"/>`
+      +   `<path d="M22 54C30 52 40 56 38 62C32 64 24 62 22 54Z"/></g>`
+      + `<circle cx="31" cy="35" r="26" fill="url(#__d)"/>`
+      + `<path d="M31 5A30 30 0 0 1 31 65" fill="none" stroke="#c9a24b" stroke-width="2.6"/>`
+      + `<path d="M31 5A30 30 0 0 1 31 65" fill="none" stroke="#fff0b0" stroke-opacity=".6" stroke-width=".8" transform="translate(-.6 0)"/>`
+      + `<circle cx="31" cy="5" r="2" fill="#c9a24b"/><circle cx="31" cy="65" r="2" fill="#c9a24b"/>`
+      + `<ellipse cx="22" cy="23" rx="6" ry="3.4" transform="rotate(-35 22 23)" fill="#fff" opacity=".35"/>` },
+
+    relogio: { nome: "Relógio", w: 54, h: 62, svg:
+      `<defs>${MADEIRA}${LATAO}<radialGradient id="__m" cx=".45" cy=".4" r=".7"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#eadfc6"/></radialGradient>${SOMBRA}</defs>`
+      + `<ellipse cx="27" cy="59" rx="23" ry="3" fill="url(#__s)"/>`
+      + `<rect x="3" y="52" width="48" height="7" rx="1.6" fill="url(#__w)"/>`
+      + `<path d="M7 53V24Q7 5 27 5Q47 5 47 24V53Z" fill="url(#__w)"/>`
+      + `<path d="M9 52V24Q9 7 24 6" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="1.6"/>`
+      + `<circle cx="27" cy="26" r="16" fill="url(#__l)"/><circle cx="27" cy="26" r="14" fill="url(#__m)"/>`
+      + `<g stroke="#3a2a1a" stroke-width="1.2" stroke-linecap="round">${marcasRelogio(27, 26, 11.4, 13)}</g>`
+      + `<path d="M27 26L21.4 22.2" stroke="#2a1a0e" stroke-width="2" stroke-linecap="round"/>`
+      + `<path d="M27 26L36.4 20.4" stroke="#2a1a0e" stroke-width="1.4" stroke-linecap="round"/>`
+      + `<circle cx="27" cy="26" r="1.6" fill="#c9a24b"/>`
+      + `<path d="M15 21A13 13 0 0 1 26 13" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="1.4" stroke-linecap="round"/>`
+      + `<rect x="19" y="43" width="16" height="7" rx="1.4" fill="#21140a"/><circle cx="27" cy="46.5" r="2.5" fill="url(#__l)"/>` },
+
+    xicara: { nome: "Xícara", w: 58, h: 48, svg:
+      `<defs>${lg("p", [[0, "#d5cfc2"], [0.4, "#ffffff"], [0.8, "#e7e1d5"], [1, "#c4bdae"]])}<radialGradient id="__c"><stop offset="0" stop-color="#6a4026"/><stop offset="1" stop-color="#3a2112"/></radialGradient>${SOMBRA}</defs>`
+      + `<ellipse cx="29" cy="45" rx="25" ry="3" fill="url(#__s)"/>`
+      + `<ellipse cx="29" cy="41" rx="24" ry="5.6" fill="url(#__p)"/><ellipse cx="29" cy="40.6" rx="15" ry="3" fill="#dcd5c6"/>`
+      + `<path d="M45 22C56 21 55 34 43 33" fill="none" stroke="#e9e3d6" stroke-width="3.6" stroke-linecap="round"/>`
+      + `<path d="M45 21C55 20.5 54 32.5 43 31.6" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width=".9"/>`
+      + `<path d="M10 18H48V25C48 35 40 40 29 40C18 40 10 35 10 25Z" fill="url(#__p)"/>`
+      + `<ellipse cx="29" cy="18" rx="19" ry="4" fill="#fbf9f4"/><ellipse cx="29" cy="18.4" rx="16.4" ry="3.1" fill="url(#__c)"/>`
+      + `<ellipse cx="24" cy="18" rx="5" ry="1" fill="#fff" opacity=".25"/>`
+      + `<g class="vapor" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M23 12C19 9 27 6 23 2"/><path d="M34 12C30 9 38 6 34 2"/></g>` },
+
+    pilha: { nome: "Pilha de livros", w: 66, h: 60, svg:
+      `<defs>${lg("a", [[0, "#7a2230"], [0.5, "#a83a4a"], [1, "#6a1c28"]], true)}${lg("b", [[0, "#1f4a3a"], [0.5, "#35705a"], [1, "#183a2e"]], true)}${lg("c", [[0, "#22355e"], [0.5, "#3b5590"], [1, "#1a2a4c"]], true)}${lg("pg", [[0, "#fbf3df"], [1, "#d8c9a4"]], true)}${SOMBRA}</defs>`
+      + `<ellipse cx="33" cy="57" rx="30" ry="3" fill="url(#__s)"/>`
+      + [[4, 40, 58, 16, "c"], [8, 24, 52, 16, "b"], [6, 10, 48, 14, "a"]].map(([x, y, w, h, g]) =>
+          `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2.5" fill="url(#__${g})"/>`
+          + `<rect x="${x + 7}" y="${y + 2.4}" width="${w - 7}" height="${h - 4.8}" fill="url(#__pg)"/>`
+          + `<path d="M${x + 8} ${y + h * 0.36}H${x + w}M${x + 8} ${y + h * 0.5}H${x + w}M${x + 8} ${y + h * 0.64}H${x + w}" stroke="#b8a67c" stroke-width=".5"/>`
+          + `<rect x="${x + 2.4}" y="${y}" width="1.3" height="${h}" fill="#e6c566" opacity=".8"/>`
+          + `<rect x="${x}" y="${y}" width="${w}" height="1.6" rx=".8" fill="#fff" opacity=".2"/>`).join("")
+      + `<path d="M40 24V34L42.5 31.5L45 34V24Z" fill="#c9372c"/>` },
+
+    livroaberto: { nome: "Livro aberto", w: 76, h: 46, svg:
+      `<defs>${lg("e", [[0, "#e9dcbc"], [0.55, "#fffaf0"], [1, "#d9caa6"]])}${lg("d", [[0, "#d9caa6"], [0.45, "#fffaf0"], [1, "#e9dcbc"]])}${SOMBRA}</defs>`
+      + `<ellipse cx="38" cy="43" rx="34" ry="3" fill="url(#__s)"/>`
+      + `<path d="M3 13C14 8 28 9 38 16C48 9 62 8 73 13V41C62 37 48 37 38 43C28 37 14 37 3 41Z" fill="#6b2d22"/>`
+      + `<path d="M5 10C15 5 29 6 38 13V40C29 34 15 34 5 38Z" fill="url(#__e)"/>`
+      + `<path d="M71 10C61 5 47 6 38 13V40C47 34 61 34 71 38Z" fill="url(#__d)"/>`
+      + `<g fill="none" stroke="#8a7a5c" stroke-opacity=".55" stroke-width=".7">`
+      +   `<path d="M10 14C18 11 27 12 33 16M10 19C18 16 27 17 33 21M10 24C18 21 27 22 33 26M10 29C18 26 27 27 33 31"/>`
+      +   `<path d="M66 14C58 11 49 12 43 16M66 19C58 16 49 17 43 21M66 24C58 21 49 22 43 26M66 29C58 26 49 27 43 31"/></g>`
+      + `<path d="M38 13V40" stroke="#b8a67c" stroke-width="1"/>`
+      + `<path d="M36.5 38V46L38 44.4L39.5 46V38Z" fill="#c9372c"/>` },
+
+    oculos: { nome: "Óculos", w: 72, h: 46, svg:
+      `<defs>${lg("a", [[0, "#22355e"], [0.5, "#3b5590"], [1, "#1a2a4c"]], true)}${lg("pg", [[0, "#fbf3df"], [1, "#d8c9a4"]], true)}${SOMBRA}</defs>`
+      + `<ellipse cx="36" cy="43" rx="32" ry="3" fill="url(#__s)"/>`
+      + `<rect x="5" y="27" width="62" height="15" rx="2.5" fill="url(#__a)"/><rect x="12" y="29.4" width="55" height="10.2" fill="url(#__pg)"/>`
+      + `<path d="M13 33H67M13 36H67" stroke="#b8a67c" stroke-width=".5"/><rect x="7.4" y="27" width="1.3" height="15" fill="#e6c566" opacity=".8"/>`
+      + `<path d="M17 19L10 26M55 19L62 26" stroke="#8a6a2a" stroke-width="1.4" stroke-linecap="round"/>`
+      + `<circle cx="26" cy="18" r="8.5" fill="#d6ecf7" fill-opacity=".3" stroke="#c9a24b" stroke-width="1.7"/>`
+      + `<circle cx="46" cy="18" r="8.5" fill="#d6ecf7" fill-opacity=".3" stroke="#c9a24b" stroke-width="1.7"/>`
+      + `<path d="M33.6 16Q36 13.4 38.4 16" fill="none" stroke="#c9a24b" stroke-width="1.7"/>`
+      + `<path d="M20.5 14.5A6.5 6.5 0 0 1 26 11.4M40.5 14.5A6.5 6.5 0 0 1 46 11.4" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="1.2" stroke-linecap="round"/>` },
+
+    tinteiro: { nome: "Tinteiro e pena", w: 56, h: 80, svg:
+      `<defs>${lg("v", [[0, "#141c3a"], [0.35, "#3a4f8f"], [0.7, "#1b2752"], [1, "#0e1430"]])}${lg("pn", [[0, "#fffdf6"], [1, "#d9d2c0"]])}${LATAO}${SOMBRA}</defs>`
+      + `<ellipse cx="24" cy="77" rx="20" ry="3" fill="url(#__s)"/>`
+      + `<path d="M22.5 50L47 5" stroke="#cfc6b0" stroke-width="1.3" stroke-linecap="round"/>`
+      + `<path d="M26 44C29 30 35 14 48 3C52 16 46 32 30 46Z" fill="url(#__pn)" stroke="#b9b09a" stroke-width=".5"/>`
+      + `<path d="M30 38L38 30M32 32L41 24M35 26L44 17M38 20L47 11M29 44L34 39" stroke="#b9b09a" stroke-width=".6" fill="none"/>`
+      + `<path d="M8 76V58Q8 51 15 51H33Q40 51 40 58V76Z" fill="url(#__v)"/>`
+      + `<rect x="17" y="44" width="14" height="8" fill="url(#__v)"/><rect x="15" y="42" width="18" height="3.4" rx="1.2" fill="url(#__l)"/>`
+      + `<rect x="13" y="59" width="22" height="11" rx="1" fill="#f1e6cc"/><path d="M16 63H32M18 66.5H30" stroke="#6b5a3a" stroke-width=".8"/>`
+      + `<path d="M11 56Q11 53.6 13.6 53.6" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="1.3" stroke-linecap="round"/>` },
+
+    maquina: { nome: "Máquina de escrever", w: 80, h: 64, svg:
+      `<defs>${lg("m", [[0, "#1c3b3e"], [0.5, "#2f6468"], [1, "#16302f"]], true)}${lg("r", [[0, "#55595e"], [0.4, "#8d9299"], [1, "#2d3034"]], true)}${SOMBRA}</defs>`
+      + `<ellipse cx="40" cy="61" rx="36" ry="3" fill="url(#__s)"/>`
+      + `<rect x="25" y="2" width="30" height="22" fill="#fbf8f0"/><path d="M29 7H51M29 11H51M29 15H46" stroke="#9a948a" stroke-width=".8"/>`
+      + `<rect x="6" y="19" width="68" height="7" rx="3.5" fill="url(#__r)"/><circle cx="5" cy="22.5" r="4" fill="#2d3034"/><circle cx="75" cy="22.5" r="4" fill="#2d3034"/>`
+      + `<rect x="11" y="25" width="58" height="10" rx="2" fill="#16302f"/>`
+      + `<path d="M7 60V46Q7 37 16 35H64Q73 37 73 46V60Z" fill="url(#__m)"/>`
+      + `<rect x="30" y="37" width="20" height="3" rx="1" fill="#e6c566"/>`
+      + [0, 1, 2].map(r => Array.from({ length: 9 - r }, (_, i) =>
+          `<circle cx="${14 + r * 3.2 + i * 6.5}" cy="${44.5 + r * 4.8}" r="2.1" fill="#f3ecd9" stroke="#0e1f1f" stroke-width=".7"/>`).join("")).join("")
+      + `<rect x="24" y="57" width="32" height="2.4" rx="1.2" fill="#f3ecd9" stroke="#0e1f1f" stroke-width=".5"/>`
+      + `<path d="M10 58V46Q10 40 17 38" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="1.4"/>` },
+
+    luminaria: { nome: "Luminária", w: 68, h: 72, svg:
+      `<defs>${lg("g", [[0, "#0d4a32"], [0.45, "#35b07a"], [1, "#0b3d29"]], true)}${LATAO}<radialGradient id="__q"><stop offset="0" stop-color="#ffe9a8" stop-opacity=".6"/><stop offset="1" stop-color="#ffe9a8" stop-opacity="0"/></radialGradient>${SOMBRA}</defs>`
+      + `<ellipse cx="34" cy="69" rx="26" ry="3" fill="url(#__s)"/>`
+      + `<ellipse cx="34" cy="36" rx="28" ry="12" fill="url(#__q)"/>`
+      + `<rect x="32" y="26" width="4" height="38" fill="url(#__l)"/>`
+      + `<path d="M14 68Q14 62 22 62H46Q54 62 54 68Z" fill="url(#__l)"/><ellipse cx="34" cy="62" rx="12" ry="2" fill="#f2d680"/>`
+      + `<path d="M7 27Q7 12 22 12H46Q61 12 61 27Z" fill="url(#__g)"/>`
+      + `<path d="M12 22Q13 15 22 14.6H40" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="1.6" stroke-linecap="round"/>`
+      + `<rect x="5" y="26" width="58" height="2.6" rx="1.3" fill="url(#__l)"/><rect x="30" y="9" width="8" height="4" rx="1.4" fill="url(#__l)"/>`
+      + `<path d="M48 28V40" stroke="#c9a24b" stroke-width=".8"/><circle cx="48" cy="41.4" r="1.6" fill="#e6c566"/>` },
+
+    ampulheta: { nome: "Ampulheta", w: 40, h: 70, svg:
+      `<defs>${MADEIRA}${SOMBRA}</defs>`
+      + `<ellipse cx="20" cy="67" rx="16" ry="2.6" fill="url(#__s)"/>`
+      + `<rect x="6" y="9" width="3" height="52" fill="url(#__w)"/><rect x="31" y="9" width="3" height="52" fill="url(#__w)"/>`
+      + `<path d="M10 11H30C30 24 23 29 21 34C23 39 30 44 30 58H10C10 44 17 39 19 34C17 29 10 24 10 11Z" fill="#cfe9f5" fill-opacity=".22" stroke="#e8f6ff" stroke-opacity=".8" stroke-width=".9"/>`
+      + `<path d="M14 17H26C25 22 22 25 20 28C18 25 15 22 14 17Z" fill="#e8c77f"/>`
+      + `<path d="M20 29V47" stroke="#e8c77f" stroke-width=".9"/>`
+      + `<path d="M11 58C12 50 17 47 20 44C23 47 28 50 29 58Z" fill="#d9b565"/>`
+      + `<path d="M12.5 14C13 22 17 27 18.5 31" stroke="#fff" stroke-opacity=".55" stroke-width="1.4" fill="none" stroke-linecap="round"/>`
+      + `<rect x="3" y="4" width="34" height="7" rx="2" fill="url(#__w)"/><rect x="3" y="58" width="34" height="7" rx="2" fill="url(#__w)"/>`
+      + `<rect x="3" y="4" width="34" height="1.8" rx=".9" fill="#fff" opacity=".25"/><rect x="3" y="58" width="34" height="1.8" rx=".9" fill="#fff" opacity=".25"/>` }
+  };
+
+  // Atalho: $("abc") é o mesmo que document.getElementById("abc")
+  const $ = (id) => document.getElementById(id);
+
+  // Guarda no navegador sem quebrar se o espaço acabar
+  function guardar(chave, valor) {
+    try { localStorage.setItem(chave, valor); return true; } catch (e) { return false; }
+  }
+
+  // ====== DADOS ======
+  let ultimosResultados = [];
+  let minhaLista = JSON.parse(localStorage.getItem("meusLivros")) || [];
+  let categoriaAberta = null;   // qual categoria está aberta na página de lista
+  let livroAberto = null;       // qual livro está aberto na página do livro
+  let abaAtual = "inicio";
+  let abaDoLivro = "inicio";    // de onde o livro foi aberto (para o botão voltar)
+  const corEmAndamento = new Set();   // livros cuja cor está sendo lida agora
+  const corFalhou = new Set();        // livros em que não deu para ler a cor (usa o plano B)
+
+  // Livros lidos antigos, sem data, ganham a data de hoje (você pode corrigir depois)
+  minhaLista.forEach(l => { if (l.status === "lido" && !l.dataLido) l.dataLido = hoje(); });
+
+  // Personalização da estante
+  let corParedeAtual = localStorage.getItem("corParede") || CORES_PAREDE[0];
+  let papelEscolhido = localStorage.getItem("papelParede") || "liso";
+  let papelProprio = localStorage.getItem("papelProprio") || "";
+  let modeloEscolhido = localStorage.getItem("modeloEstante") || "classica";
+  let estruturaEscolhida = localStorage.getItem("estruturaEstante") === "prateleiras" ? "prateleiras" : "inteira";
+  let luzesEscolhidas = LUZES[localStorage.getItem("luzesEstante")] ? localStorage.getItem("luzesEstante") : "nenhuma";
+  let decoracoes = [];
+  try { decoracoes = (JSON.parse(localStorage.getItem("decoracoes")) || []).filter(d => d.tipo === "imagem" || DECORACOES[d.tipo]); } catch (e) {}
+  let ordemSalva = [];      // a ordem que você montou arrastando (vazia = ordem por data)
+  try { ordemSalva = JSON.parse(localStorage.getItem("ordemEstante")) || []; if (!Array.isArray(ordemSalva)) ordemSalva = []; } catch (e) {}
+  let modoOrganizar = false;
+  const FILEIRAS = 7;        // quantas prateleiras cada estante tem
+  let arrumacao = null;      // onde você colocou cada peça: estantes > prateleiras > peças (null = automático, por data)
+  try { arrumacao = JSON.parse(localStorage.getItem("arrumacaoEstante")); if (!Array.isArray(arrumacao)) arrumacao = null; } catch (e) { arrumacao = null; }
+  const cacheImagensDeco = {};
+  if (!MODELOS[modeloEscolhido]) modeloEscolhido = "classica";
+  if (papelEscolhido === "minha" ? !papelProprio : !PAPEIS[papelEscolhido]) papelEscolhido = "liso";
+
+  function salvarLista() {
+    localStorage.setItem("meusLivros", JSON.stringify(minhaLista));
+  }
+
+  function hoje() {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  // "2026-11-14" vira "14/11/2026"
+  function formatarData(iso) {
+    const p = iso.split("-");
+    return p[2] + "/" + p[1] + "/" + p[0];
+  }
+
+  // Deixa um texto seguro para entrar na página
+  function limpar(texto) {
+    const d = document.createElement("div");
+    d.textContent = texto;
+    return d.innerHTML;
+  }
+
+  function dadosDoLivro(livro) {
+    const info = livro.volumeInfo;
+    const miniatura = info.imageLinks ? info.imageLinks.thumbnail : "";
+    return {
+      id: livro.id,
+      titulo: info.title || "Sem título",
+      autor: info.authors ? info.authors.join(", ") : "Autor desconhecido",
+      capa: miniatura ? miniatura.replace("http://", "https://") : ""
+    };
+  }
+
+  // Muda o status de um livro (e anota a data quando vira "lido")
+  function definirStatus(livro, status) {
+    livro.status = status;
+    if (status === "lido" && !livro.dataLido) livro.dataLido = hoje();
+  }
+
+  // ====== COR DA CAPA (para a lombada e o livro deitado) ======
+  function rgbParaHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    const l = (mx + mn) / 2;
+    const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+    let h = 0;
+    if (d !== 0) {
+      if (mx === r) h = ((g - b) / d + 6) % 6;
+      else if (mx === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+    }
+    return [h * 60, s, l];
+  }
+
+  // Olha os pixels da capa e acha a cor que mais aparece (ignorando branco e preto)
+  function corDominante(img) {
+    const L = 24, A = 36;
+    const tela = document.createElement("canvas");
+    tela.width = L; tela.height = A;
+    const g = tela.getContext("2d");
+    g.drawImage(img, 0, 0, L, A);
+    const px = g.getImageData(0, 0, L, A).data;
+
+    const baldes = Array.from({ length: 12 }, () => ({ peso: 0, r: 0, g: 0, b: 0 }));
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] < 128) continue;
+      const [h, s, l] = rgbParaHsl(px[i], px[i + 1], px[i + 2]);
+      if (l > 0.92 || l < 0.08) continue;
+      const peso = 0.05 + s * s;                 // cores vivas valem mais
+      const b = baldes[Math.floor(h / 30) % 12];
+      b.peso += peso; b.r += px[i] * peso; b.g += px[i + 1] * peso; b.b += px[i + 2] * peso;
+    }
+    const melhor = baldes.reduce((a, b) => (b.peso > a.peso ? b : a));
+    if (melhor.peso === 0) return null;
+
+    let [h, s, l] = rgbParaHsl(melhor.r / melhor.peso, melhor.g / melhor.peso, melhor.b / melhor.peso);
+    s = Math.min(s, 0.8);
+    l = Math.min(Math.max(l, 0.2), 0.42);        // escuro o bastante para o texto branco ler bem
+    return "hsl(" + Math.round(h) + ", " + Math.round(s * 100) + "%, " + Math.round(l * 100) + "%)";
+  }
+
+  function extrairCor(livro) {
+    if (!livro.capa || livro.corCapa || corEmAndamento.has(livro.id) || corFalhou.has(livro.id)) return;
+    corEmAndamento.add(livro.id);
+
+    const terminar = (cor) => {
+      corEmAndamento.delete(livro.id);
+      if (cor) { livro.corCapa = cor; salvarLista(); } else { corFalhou.add(livro.id); }
+      desenharEstante();
+    };
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      let cor = null;
+      try { cor = corDominante(img); } catch (e) {}
+      terminar(cor);
+    };
+    img.onerror = () => terminar(null);
+    // um parâmetro a mais no endereço evita usar a versão guardada sem permissão de leitura
+    img.src = /^https?:/.test(livro.capa) ? livro.capa + (livro.capa.includes("?") ? "&" : "?") + "cor=1" : livro.capa;
+  }
+
+  // ====== TEMA CLARO / ESCURO ======
+  let temaEscolhido = localStorage.getItem("tema") || "auto";
+  const modoEscuroDoCelular = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+  function aplicarTema() {
+    const escuro = temaEscolhido === "escuro" || (temaEscolhido === "auto" && modoEscuroDoCelular && modoEscuroDoCelular.matches);
+    document.documentElement.setAttribute("data-tema", escuro ? "escuro" : "claro");
+    document.querySelectorAll("#botoesTema button").forEach(b => b.classList.toggle("ativo", b.dataset.tema === temaEscolhido));
+  }
+
+  function escolherTema(tema) {
+    temaEscolhido = tema;
+    localStorage.setItem("tema", tema);
+    aplicarTema();
+  }
+
+  // No modo "Automático", acompanha quando o celular troca de dia para noite
+  if (modoEscuroDoCelular && modoEscuroDoCelular.addEventListener) {
+    modoEscuroDoCelular.addEventListener("change", aplicarTema);
+  }
+
+  // ====== ABAS E PÁGINAS ======
+  function mostrarAba(nome) {
+    abaAtual = nome;
+    if (nome !== "livro") livroAberto = null;
+    if (modoOrganizar && nome !== "estante" && nome !== "livro") { modoOrganizar = false; desenharEstante(); }
+
+    let noMenu = nome;                                          // qual ícone do menu fica aceso
+    if (nome === "lista") noMenu = "inicio";
+    if (nome === "livro") noMenu = (abaDoLivro === "lista") ? "inicio" : abaDoLivro;
+
+    document.querySelectorAll(".aba").forEach(a => a.classList.toggle("ativa", a.id === "aba-" + nome));
+    document.querySelectorAll(".menu button").forEach(b => b.classList.toggle("ativo", b.dataset.aba === noMenu));
+    $("botaoVoltar").hidden = !(nome === "lista" || nome === "livro");
+    $("tituloTopo").textContent = nome === "lista" ? NOMES[categoriaAberta]
+                                : nome === "livro" ? "Livro"
+                                : TITULOS_ABAS[nome];
+    window.scrollTo(0, 0);
+  }
+
+  function voltar() {
+    if (abaAtual === "livro") mostrarAba(abaDoLivro);
+    else mostrarAba("inicio");
+  }
+
+  function abrirCategoria(status) {
+    categoriaAberta = status;
+    desenharLista();
+    mostrarAba("lista");
+  }
+
+  // Abre a página de um livro (é chamada ao tocar em qualquer capa)
+  function abrirDetalhes(id) {
+    if (abaAtual !== "livro") abaDoLivro = abaAtual;
+    livroAberto = id;
+    desenharLivro();
+    mostrarAba("livro");
+  }
+
+  // ====== BUSCA ======
+  $("botaoLupa").addEventListener("click", () => {
+    $("painelBusca").hidden = !$("painelBusca").hidden;
+    if (!$("painelBusca").hidden) {
+      window.scrollTo(0, 0);
+      $("campoBusca").focus();
+    }
+  });
+
+  async function buscarLivros() {
+    const termo = $("campoBusca").value.trim();
+    if (termo === "") return;
+
+    $("resultados").innerHTML = `<p class="msg">Buscando...</p>`;
+
+    const prefixo = $("tipoBusca").value;
+    const consulta = prefixo ? prefixo + '"' + termo + '"' : termo;
+
+    try {
+      const url = "https://www.googleapis.com/books/v1/volumes?q=" + encodeURIComponent(consulta)
+                + "&maxResults=12&printType=books"
+                + ($("soPortugues").checked ? "&langRestrict=pt" : "")
+                + "&key=" + CHAVE_API;
+      const resposta = await fetch(url);
+      const dados = await resposta.json();
+
+      if (!resposta.ok) {
+        $("resultados").innerHTML = `<p class="msg">Erro da API: ${limpar(dados.error?.message || String(resposta.status))}</p>`;
+        return;
+      }
+
+      ultimosResultados = dados.items || [];
+      mostrarResultados();
+    } catch (erro) {
+      $("resultados").innerHTML = `<p class="msg">Ops, algo deu errado. Tente de novo.</p>`;
+    }
+  }
+
+  function mostrarResultados() {
+    if (ultimosResultados.length === 0) {
+      $("resultados").innerHTML = `<p class="msg">Nenhum livro encontrado.</p>`;
+      return;
+    }
+
+    $("resultados").innerHTML = ultimosResultados.map((livro, i) => {
+      const l = dadosDoLivro(livro);
+      return `
+        <div class="card">
+          ${l.capa ? `<img src="${l.capa}" alt="">` : `<div class="sem-capa">Sem capa</div>`}
+          <h3>${limpar(l.titulo)}</h3>
+          <p>${limpar(l.autor)}</p>
+          <button onclick="adicionarLivro(${i}, 'quero')">${ICONES.quero} ${NOMES.quero}</button>
+          <button onclick="adicionarLivro(${i}, 'lendo')">${ICONES.lendo} ${NOMES.lendo}</button>
+          <button onclick="adicionarLivro(${i}, 'lido')">${ICONES.lido} ${NOMES.lido}</button>
+        </div>`;
+    }).join("");
+  }
+
+  function adicionarLivro(indice, status) {
+    const l = dadosDoLivro(ultimosResultados[indice]);
+    let livro = minhaLista.find(item => item.id === l.id);
+
+    if (!livro) {
+      livro = l;
+      livro.estilo = "capa";
+      minhaLista.push(livro);
+    }
+
+    definirStatus(livro, status);
+    salvarLista();
+    desenharTudo();
+    extrairCor(livro);
+    avisar('Adicionado em "' + NOMES[status] + '"');
+  }
+
+  $("botaoBuscar").addEventListener("click", buscarLivros);
+  $("campoBusca").addEventListener("keydown", (e) => { if (e.key === "Enter") buscarLivros(); });
+
+  // ====== AVISO RAPIDINHO ======
+  function avisar(texto) {
+    $("aviso").textContent = texto;
+    $("aviso").classList.add("visivel");
+    setTimeout(() => $("aviso").classList.remove("visivel"), 1800);
+  }
+
+  // ====== DESENHAR: INÍCIO ======
+  function capaOuTitulo(l) {
+    return l.capa
+      ? `<img src="${l.capa}" alt="" onclick="abrirDetalhes('${l.id}')">`
+      : `<div class="sem-capa-mini" onclick="abrirDetalhes('${l.id}')">${limpar(l.titulo)}</div>`;
+  }
+
+  function desenharInicio() {
+    const nome = localStorage.getItem("nomeLeitor");
+    let html = nome ? `<p class="saudacao">Olá, ${limpar(nome)} 👋</p>` : "";
+
+    ["lendo", "quero", "lido"].forEach(status => {
+      const livros = minhaLista.filter(l => l.status === status);
+
+      // A setinha só aparece quando tem mais livros do que cabem no Início
+      const seta = livros.length > MAX_NO_INICIO
+        ? `<button class="seta" onclick="abrirCategoria('${status}')" aria-label="Ver todos os livros de ${NOMES[status]}">
+             <svg class="icone" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+           </button>`
+        : "";
+
+      html += `<div class="secao-topo">
+                 <h2>${ICONES[status]} ${NOMES[status]} <small>(${livros.length})</small></h2>
+                 ${seta}
+               </div>`;
+
+      if (livros.length === 0) {
+        html += `<p class="vazio">Nada por aqui ainda. Toque na lupa lá em cima para buscar um livro.</p>`;
+      } else {
+        html += `<div class="grade-capas">${livros.slice(0, MAX_NO_INICIO).map(capaOuTitulo).join("")}</div>`;
+      }
+    });
+
+    $("aba-inicio").innerHTML = html;
+  }
+
+  // ====== DESENHAR: PÁGINA DE LISTA (todos os livros de uma categoria) ======
+  function estrelasTexto(n) {
+    return "★".repeat(n) + "☆".repeat(5 - n);
+  }
+
+  function itemDaLista(l) {
+    const capa = l.capa
+      ? `<img src="${l.capa}" alt="">`
+      : `<div class="sem-capa-mini">${limpar(l.titulo)}</div>`;
+    const data = (l.status === "lido" && l.dataLido)
+      ? `<p class="data">Lido em ${formatarData(l.dataLido)}</p>` : "";
+    const nota = (l.status === "lido" && l.nota)
+      ? `<p class="estrelas-mini">${estrelasTexto(l.nota)}</p>` : "";
+
+    return `
+      <div class="item-lista" onclick="abrirDetalhes('${l.id}')">
+        <div class="capa-lista">${capa}</div>
+        <div>
+          <h3>${limpar(l.titulo)}</h3>
+          <p>${limpar(l.autor)}</p>
+          ${data}${nota}
+        </div>
+      </div>`;
+  }
+
+  function desenharLista() {
+    if (!categoriaAberta) { $("aba-lista").innerHTML = ""; return; }
+
+    const livros = minhaLista.filter(l => l.status === categoriaAberta);
+    if (categoriaAberta === "lido") {
+      livros.sort((a, b) => b.dataLido.localeCompare(a.dataLido));   // últimos lidos primeiro
+    }
+
+    const qtd = livros.length + (livros.length === 1 ? " livro" : " livros");
+    $("aba-lista").innerHTML = livros.length === 0
+      ? `<p class="qtd-lista">Nada por aqui ainda.</p>`
+      : `<p class="qtd-lista">${qtd}</p>` + livros.map(itemDaLista).join("");
+  }
+
+  // ====== DESENHAR: PÁGINA DO LIVRO ======
+  const ESTRELA = `<svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
+
+  function desenharLivro() {
+    const l = minhaLista.find(x => x.id === livroAberto);
+    if (!l) { $("aba-livro").innerHTML = ""; return; }
+
+    const botoesStatus = ["quero", "lendo", "lido"].map(s =>
+      `<button class="${l.status === s ? "ativo" : ""}" onclick="mudarStatus('${l.id}', '${s}')">${ICONES[s]} ${NOMES[s]}</button>`
+    ).join("");
+
+    // Nota, data e estilo na estante: só para livros já lidos
+    let blocoLido = "";
+    if (l.status === "lido") {
+      const estrelas = [1, 2, 3, 4, 5].map(n =>
+        `<button class="${n <= (l.nota || 0) ? "cheia" : ""}" onclick="mudarNota('${l.id}', ${n})" aria-label="${n} estrelas">${ESTRELA}</button>`
+      ).join("");
+      const botoesEstilo = ["capa", "lombada", "deitado"].map(e =>
+        `<button class="${(l.estilo || "capa") === e ? "ativo" : ""}" onclick="mudarEstilo('${l.id}', '${e}')">${e[0].toUpperCase() + e.slice(1)}</button>`
+      ).join("");
+      blocoLido = `
+        <p class="rotulo">Minha nota</p>
+        <div class="estrelas">${estrelas}</div>
+        <p class="rotulo">Terminei de ler em</p>
+        <input type="date" value="${l.dataLido}" onchange="mudarData('${l.id}', this.value)">
+        <p class="rotulo">Como aparece na estante</p>
+        <div class="grupo">${botoesEstilo}</div>`;
+    }
+
+    const capa = l.capa ? `<img src="${l.capa}" alt="">` : `<div class="sem-capa-mini">${limpar(l.titulo)}</div>`;
+    $("aba-livro").innerHTML = `
+      <div class="livro-pagina">
+        <div class="livro-cabeca">
+          <div class="capa-grande">${capa}</div>
+          <div><h2>${limpar(l.titulo)}</h2><p>${limpar(l.autor)}</p></div>
+        </div>
+        <p class="rotulo">Onde ele está</p>
+        <div class="grupo">${botoesStatus}</div>
+        ${blocoLido}
+        <p class="rotulo">Minhas anotações</p>
+        <textarea class="anotacao" id="campoAnotacao" placeholder="O que você está pensando sobre esse livro?"
+                  oninput="salvarAnotacao('${l.id}', this.value)">${limpar(l.anotacao || "")}</textarea>
+        <p class="salvo" id="msgSalvo"></p>
+        <button class="perigo" onclick="removerLivro('${l.id}')">Remover da minha lista</button>
+      </div>`;
+  }
+
+  let temporizadorSalvo;
+  function salvarAnotacao(id, texto) {
+    const l = minhaLista.find(x => x.id === id);
+    if (!l) return;
+    l.anotacao = texto;
+    salvarLista();
+    const msg = $("msgSalvo");
+    if (msg) {
+      msg.textContent = "Salvo automaticamente ✓";
+      clearTimeout(temporizadorSalvo);
+      temporizadorSalvo = setTimeout(() => { msg.textContent = ""; }, 1500);
+    }
+  }
+
+  function mudarNota(id, n) {
+    const l = minhaLista.find(x => x.id === id);
+    l.nota = (l.nota === n) ? 0 : n;       // tocar na mesma estrela de novo tira a nota
+    salvarLista();
+    desenharTudo();
+  }
+
+  function mudarStatus(id, status) {
+    definirStatus(minhaLista.find(x => x.id === id), status);
+    salvarLista();
+    desenharTudo();
+  }
+
+  function mudarEstilo(id, estilo) {
+    minhaLista.find(x => x.id === id).estilo = estilo;
+    salvarLista();
+    desenharTudo();
+  }
+
+  function mudarData(id, valor) {
+    if (!valor) return;
+    minhaLista.find(x => x.id === id).dataLido = valor;
+    salvarLista();
+    desenharEstante();
+    desenharLista();
+    desenharResumo();
+  }
+
+  function removerLivro(id) {
+    minhaLista = minhaLista.filter(x => x.id !== id);
+    salvarLista();
+    desenharTudo();
+    voltar();
+  }
+
+  // ====== DESENHAR: ESTANTE ======
+  function corDaLombada(titulo) {
+    let soma = 0;
+    for (const letra of titulo) soma += letra.charCodeAt(0);
+    return "hsl(" + (soma * 37 % 360) + ", 45%, 35%)";
+  }
+
+  // --- Medir o texto: o título inteiro precisa caber na lombada ---
+  const medidor = document.createElement("canvas").getContext("2d");
+  function larguraTexto(txt, px) {
+    medidor.font = "bold " + px + "px Georgia, 'Times New Roman', serif";
+    return medidor.measureText(txt).width * 1.04 + txt.length * 0.25 + 1;
+  }
+
+  // Divide o título em linhas que cabem em "maximo" pixels. Devolve null se uma palavra sozinha não couber.
+  function quebrarTitulo(titulo, px, maximo) {
+    const palavras = titulo.split(/\s+/).filter(Boolean);
+    const linhas = [];
+    let atual = "";
+    for (const p of palavras) {
+      const tentativa = atual ? atual + " " + p : p;
+      if (larguraTexto(tentativa, px) <= maximo) { atual = tentativa; continue; }
+      if (atual) linhas.push(atual);
+      if (larguraTexto(p, px) > maximo) return null;
+      atual = p;
+    }
+    if (atual) linhas.push(atual);
+    return linhas;
+  }
+
+  // Um número "aleatório" que é sempre o mesmo para o mesmo livro (para cada um ter alturas diferentes)
+  function hashDe(txt) {
+    let h = 0;
+    for (const c of txt) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return h;
+  }
+
+  const cacheMedidas = {};
+  function medidasLombada(titulo, id) {
+    const chave = "v" + id + "|" + titulo;
+    if (cacheMedidas[chave]) return cacheMedidas[chave];
+    const h = hashDe(id + titulo);
+    const altura = 108 + (h % 9);                 // cada lombada tem uma altura (108 a 116)
+    const maximo = altura - 32;                   // espaço para o texto, entre os filetes
+    const tentativas = [[12, 2], [11, 2], [10, 2], [9.5, 3], [9, 3], [8.5, 4], [8, 4], [7.5, 5]];
+    let escolha = null;
+    for (const [px, maxLinhas] of tentativas) {
+      const linhas = quebrarTitulo(titulo, px, maximo);
+      if (linhas && linhas.length <= maxLinhas) { escolha = { px, linhas }; break; }
+    }
+    if (!escolha) escolha = { px: 7.5, linhas: [titulo] };   // palavra gigante: último recurso
+    const largura = Math.round(escolha.linhas.length * escolha.px * 1.3 + 18 + (h >> 3) % 5);
+    return (cacheMedidas[chave] = { px: escolha.px, linhas: escolha.linhas, largura, altura });
+  }
+
+  function medidasDeitado(titulo, id) {
+    const chave = "d" + id + "|" + titulo;
+    if (cacheMedidas[chave]) return cacheMedidas[chave];
+    const h = hashDe(id + titulo);
+    const maximo = 104;                           // título comprido quebra em linhas em vez de esticar o livro
+    let escolha = null;
+    for (const [px, maxLinhas] of [[12, 2], [11, 2], [10, 3], [9, 3], [9, 4], [8, 5]]) {
+      const linhas = quebrarTitulo(titulo, px, maximo);
+      if (linhas && linhas.length <= maxLinhas) { escolha = { px, linhas }; break; }
+    }
+    if (!escolha) escolha = { px: 8, linhas: [titulo] };
+    const maisLonga = Math.max(...escolha.linhas.map(l => larguraTexto(l, escolha.px)));
+    const largura = Math.min(150, Math.max(88, Math.round(maisLonga + 30)));
+    const altura = Math.round(escolha.linhas.length * escolha.px * 1.3 + 12 + (h % 4));
+    return (cacheMedidas[chave] = { px: escolha.px, linhas: escolha.linhas, largura, altura });
+  }
+
+  // Monta a lombada ou o livro deitado, com a cor da capa
+  function pecaColorida(classe, livro) {
+    const m = classe === "lombada" ? medidasLombada(livro.titulo, livro.id) : medidasDeitado(livro.titulo, livro.id);
+    const texto = `<span class="texto-lombada" style="font-size:${m.px}px">${m.linhas.map(limpar).join("<br>")}</span>`;
+    const tamanho = `width:${m.largura}px;height:${m.altura}px;`;
+    const filetes = classe === "lombada"
+      ? `<i class="filete" style="top:6px"></i><i class="filete" style="bottom:6px"></i>`
+      : `<i class="filete" style="left:7px"></i><i class="filete" style="right:7px"></i>`;
+
+    if (livro.corCapa) {
+      return `<div class="${classe}" style="${tamanho}background-color:${livro.corCapa}">${filetes}${texto}</div>`;
+    }
+    if (livro.capa) {   // plano B: a própria capa desfocada (também fica na cor da capa)
+      return `<div class="${classe} com-capa" style="${tamanho}background-color:#444">
+                <span class="fundo-capa" style="background-image:url('${livro.capa}')"></span>${filetes}${texto}
+              </div>`;
+    }
+    return `<div class="${classe}" style="${tamanho}background-color:${corDaLombada(livro.titulo)}">${filetes}${texto}</div>`;
+  }
+
+  function pecaDoLivro(livro) {
+    let estilo = livro.estilo || "capa";
+    if (!livro.capa && estilo === "capa") estilo = "lombada"; // sem capa, vira lombada
+
+    let aparencia;
+    if (estilo === "lombada") aparencia = pecaColorida("lombada", livro);
+    else if (estilo === "deitado") aparencia = pecaColorida("deitado", livro);
+    else aparencia = `<img class="capa-estante" src="${livro.capa}" alt="" draggable="false">`;
+
+    return `<div class="livro-estante" data-chave="l:${livro.id}" onclick="tocarPeca('l:${livro.id}')">${aparencia}</div>`;
+  }
+
+  // --- Enfeites ---
+  let contadorSvg = 0;
+  function svgDeco(tipo, escala) {
+    const d = DECORACOES[tipo];
+    const e = escala || 1;
+    const prefixo = "u" + (++contadorSvg) + "_";
+    return `<svg viewBox="0 0 ${d.w} ${d.h}" width="${Math.round(d.w * e)}" height="${Math.round(d.h * e)}" aria-hidden="true">${d.svg.replace(/__/g, prefixo)}</svg>`;
+  }
+
+  function imagemDaDeco(id) {
+    if (!(id in cacheImagensDeco)) {
+      try { cacheImagensDeco[id] = localStorage.getItem("decoImg_" + id) || ""; } catch (e) { cacheImagensDeco[id] = ""; }
+    }
+    return cacheImagensDeco[id];
+  }
+
+  function conteudoDaDeco(d) {
+    if (d.tipo === "imagem") {
+      const e = d.escala || 1;
+      const s = Math.min(88 / d.h, 130 / d.w);
+      return `<img class="deco-img" src="${imagemDaDeco(d.id)}" width="${Math.round(d.w * s * e)}" height="${Math.round(d.h * s * e)}" alt="" draggable="false">`;
+    }
+    return svgDeco(d.tipo, d.escala);
+  }
+
+  function pecaDaDeco(d) {
+    return `<div class="livro-estante" data-chave="d:${d.id}" onclick="tocarPeca('d:${d.id}')">${conteudoDaDeco(d)}</div>`;
+  }
+
+  // --- A ordem das peças na estante ---
+  // Sem ordem salva: enfeites do começo, livros por data, enfeites do fim.
+  // Com ordem salva (depois de arrastar): ela manda, e o que for novo entra no fim.
+  function ordemCompleta() {
+    const lidos = minhaLista.filter(l => l.status === "lido").sort((a, b) => a.dataLido.localeCompare(b.dataLido));
+    const padrao = [
+      ...decoracoes.filter(d => d.lado === "inicio").map(d => "d:" + d.id),
+      ...lidos.map(l => "l:" + l.id),
+      ...decoracoes.filter(d => d.lado !== "inicio").map(d => "d:" + d.id)
+    ];
+    const existe = new Set(padrao);
+    const salvas = ordemSalva.filter(k => existe.has(k));
+    const vistas = new Set(salvas);
+    return salvas.concat(padrao.filter(k => !vistas.has(k)));
+  }
+
+  function chavesVisiveis(ano, mes) {
+    const livrosVisiveis = new Set(minhaLista
+      .filter(l => l.status === "lido")
+      .filter(l => !ano || l.dataLido.slice(0, 4) === ano)
+      .filter(l => !mes || l.dataLido.slice(5, 7) === mes)
+      .map(l => "l:" + l.id));
+    return ordemCompleta().filter(k => k[0] === "d" || livrosVisiveis.has(k));
+  }
+
+  function pecaPorChave(k) {
+    if (k[0] === "l") {
+      const l = minhaLista.find(x => x.id === k.slice(2));
+      return l ? pecaDoLivro(l) : "";
+    }
+    const d = decoracoes.find(x => x.id === k.slice(2));
+    return d ? pecaDaDeco(d) : "";
+  }
+
+  // --- A arrumação: em que estante e em que prateleira fica cada peça ---
+  // Sem arrumação salva: as peças entram em fila (ordem por data). Depois que você arrasta, vale a sua.
+  function larguraDaPeca(k) {
+    if (k[0] === "l") {
+      const l = minhaLista.find(x => x.id === k.slice(2));
+      if (!l) return 0;
+      let estilo = l.estilo || "capa";
+      if (!l.capa && estilo === "capa") estilo = "lombada";
+      if (estilo === "lombada") return medidasLombada(l.titulo, l.id).largura;
+      if (estilo === "deitado") return medidasDeitado(l.titulo, l.id).largura;
+      return 72;
+    }
+    const d = decoracoes.find(x => x.id === k.slice(2));
+    if (!d) return 0;
+    const e = d.escala || 1;
+    if (d.tipo === "imagem") return Math.round(d.w * Math.min(88 / d.h, 130 / d.w) * e);
+    return Math.round(DECORACOES[d.tipo].w * e);
+  }
+
+  function larguraDaFileira() {
+    const total = $("estantes").clientWidth || (Math.min(480, window.innerWidth) - 16);
+    return total - 16 - (estruturaEscolhida === "inteira" ? 20 : 0) - 12;
+  }
+
+  const novaEstante = () => Array.from({ length: FILEIRAS }, () => []);
+  const ocupado = (fileira) => fileira.reduce((soma, k) => soma + larguraDaPeca(k) + 4, 0);
+
+  function montarArrumacao() {
+    const todas = ordemCompleta();
+    const existe = new Set(todas);
+    const limite = larguraDaFileira() + 4;
+    const vistos = new Set();
+    const est = (arrumacao || []).map(e => Array.from({ length: FILEIRAS }, (_, i) =>
+      (e[i] || []).filter(k => existe.has(k) && !vistos.has(k) && vistos.add(k))));
+    if (!est.length) est.push(novaEstante());
+
+    // se uma prateleira ficou cheia demais (tela menor, livro mudou de estilo...), o excesso desce
+    for (let ei = 0; ei < est.length; ei++) {
+      for (let fi = 0; fi < FILEIRAS; fi++) {
+        const f = est[ei][fi];
+        while (f.length > 1 && ocupado(f) > limite) {
+          const k = f.pop();
+          let ne = ei, nf = fi + 1;
+          if (nf >= FILEIRAS) { ne++; nf = 0; }
+          if (!est[ne]) est.push(novaEstante());
+          est[ne][nf].unshift(k);
+        }
+      }
+    }
+
+    // peças novas: na primeira prateleira com espaço
+    let ce = 0, cf = 0;
+    for (const k of todas) {
+      if (vistos.has(k)) continue;
+      const w = larguraDaPeca(k) + 4;
+      if (arrumacao) { ce = 0; cf = 0; }
+      for (;;) {
+        if (!est[ce]) est.push(novaEstante());
+        const f = est[ce][cf];
+        if (!f.length || ocupado(f) + w <= limite) { f.push(k); break; }
+        cf++;
+        if (cf >= FILEIRAS) { cf = 0; ce++; }
+      }
+    }
+    while (est.length > 1 && est[est.length - 1].every(f => !f.length)) est.pop();
+    return est;
+  }
+
+  function htmlMovel(estante) {
+    const luz = luzesEscolhidas !== "nenhuma";
+    const classes = "movel " + (estruturaEscolhida === "inteira" ? "inteira" : "flutuante") + (luz ? " com-luz" : "");
+    const fileiras = estante.map(f =>
+      `<div class="fileira">${luz ? `<div class="luz"></div>` : ""}${f.map(pecaPorChave).join("")}</div><div class="tabua"></div>`).join("");
+    return `<div class="vaga"><div class="${classes}"><div class="coroa"></div><div class="corpo">${fileiras}</div><div class="rodape"></div></div></div>`;
+  }
+
+  let redesenharDepois = false;
+  function desenharEstante() {
+    if (arrasto && arrasto.iniciou) { redesenharDepois = true; return; }   // não mexe nas peças enquanto você arrasta
+    const lidos = minhaLista.filter(l => l.status === "lido");
+
+    // Filtro de ano: lista só os anos que existem nos seus livros
+    const anos = [...new Set(lidos.map(l => l.dataLido.slice(0, 4)))].sort().reverse();
+    const anoAntes = $("filtroAno").value;
+    $("filtroAno").innerHTML = `<option value="">Todos os anos</option>`
+      + anos.map(a => `<option value="${a}">${a}</option>`).join("");
+    $("filtroAno").value = anos.includes(anoAntes) ? anoAntes : "";
+
+    const ano = $("filtroAno").value;
+    const mes = $("filtroMes").value;
+    const filtrando = !!(ano || mes);
+    if (filtrando) modoOrganizar = false;                 // só dá para organizar vendo todos os livros
+
+    const visiveis = new Set(chavesVisiveis(ano, mes));
+    const qtdLivros = [...visiveis].filter(k => k[0] === "l").length;
+    $("contagem").textContent = qtdLivros + (qtdLivros === 1 ? " livro" : " livros");
+
+    let est = montarArrumacao().map(e => e.map(f => f.filter(k => visiveis.has(k))));
+    if (filtrando) {
+      est = est.filter(e => e.some(f => f.length));
+      if (!est.length) est = [novaEstante()];
+    }
+    if (modoOrganizar) est.push(novaEstante());           // uma estante vazia a mais, para você ter para onde levar
+
+    $("estantes").innerHTML = est.map(htmlMovel).join("");
+    atualizarOrganizar();
+    atualizarPontos();
+  }
+
+  // Bolinhas embaixo: mostram em qual estante você está
+  function atualizarPontos() {
+    const t = $("estantes"), n = t.children.length;
+    const atual = Math.round(t.scrollLeft / Math.max(1, t.clientWidth));
+    $("pontos").innerHTML = n < 2 ? "" : Array.from({ length: n }, (_, i) =>
+      `<button class="${i === atual ? "ativo" : ""}" onclick="irParaEstante(${i})" aria-label="Estante ${i + 1}"></button>`).join("");
+  }
+  function irParaEstante(i) {
+    const t = $("estantes");
+    t.scrollTo({ left: i * t.clientWidth, behavior: "smooth" });
+  }
+  let pontosNaFila = false;
+  $("estantes").addEventListener("scroll", () => {
+    if (pontosNaFila) return;
+    pontosNaFila = true;
+    requestAnimationFrame(() => { pontosNaFila = false; atualizarPontos(); });
+  });
+  let esperaTamanho;
+  window.addEventListener("resize", () => { clearTimeout(esperaTamanho); esperaTamanho = setTimeout(desenharEstante, 200); });
+
+  // ====== ESTANTE: ORGANIZAR (ARRASTAR) ======
+  let arrasto = null;
+  let ultimoArrasto = 0;
+  let rolagemAuto = 0;
+
+  function atualizarOrganizar() {
+    $("estantes").classList.toggle("organizando", modoOrganizar);
+    $("faixaOrganizar").hidden = !modoOrganizar;
+    $("textoOrganizar").textContent = modoOrganizar ? "Pronto" : "Organizar";
+    $("botaoOrganizar").classList.toggle("ativo-org", modoOrganizar);
+    $("botaoMais").hidden = modoOrganizar;
+  }
+
+  function alternarOrganizar() {
+    if (!modoOrganizar && ($("filtroAno").value || $("filtroMes").value)) {
+      avisar("Tire o filtro de ano e mês para organizar");
+      return;
+    }
+    modoOrganizar = !modoOrganizar;
+    desenharEstante();
+    if (modoOrganizar) avisar("Segure e arraste");
+  }
+
+  let quandoPediuData = 0;
+  function ordenarPorData() {
+    if (Date.now() - quandoPediuData > 3000) {          // primeiro toque só pergunta
+      quandoPediuData = Date.now();
+      $("botaoPorData").textContent = "Toque de novo para confirmar";
+      setTimeout(() => { $("botaoPorData").textContent = "Arrumar por data"; }, 3000);
+      return;
+    }
+    quandoPediuData = 0;
+    arrumacao = null;
+    ordemSalva = [];
+    try { localStorage.removeItem("arrumacaoEstante"); } catch (e) {}
+    guardar("ordemEstante", "[]");
+    $("botaoPorData").textContent = "Arrumar por data";
+    desenharEstante();
+    avisar("Livros em ordem de data");
+  }
+
+  // Tocar numa peça: abre o livro ou o enfeite (no modo Organizar, não faz nada)
+  function tocarPeca(chave) {
+    if (modoOrganizar || Date.now() - ultimoArrasto < 400) return;
+    if (chave[0] === "l") abrirDetalhes(chave.slice(2)); else abrirDecoracao(chave.slice(2));
+  }
+
+  $("estantes").addEventListener("pointerdown", (e) => {
+    if (!modoOrganizar || arrasto || (e.pointerType === "mouse" && e.button !== 0)) return;
+    const peca = e.target.closest(".livro-estante[data-chave]");
+    if (!peca) return;
+    arrasto = { peca, id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY,
+                toque: e.pointerType !== "mouse", iniciou: false, mudou: false, clone: null, dx: 0, dy: 0, timer: 0 };
+    // No celular é preciso segurar um instante (senão não dá para rolar a página nem trocar de estante)
+    if (arrasto.toque) arrasto.timer = setTimeout(iniciarArrasto, 220);
+  });
+
+  document.addEventListener("pointermove", (e) => {
+    if (!arrasto || e.pointerId !== arrasto.id) return;
+    arrasto.x = e.clientX; arrasto.y = e.clientY;
+    if (!arrasto.iniciou) {
+      const distancia = Math.hypot(e.clientX - arrasto.x0, e.clientY - arrasto.y0);
+      if (arrasto.toque) { if (distancia > 10) soltarSemArrastar(); }   // mexeu antes de segurar: é rolagem
+      else if (distancia > 4) iniciarArrasto();
+      return;
+    }
+    moverArrasto();
+  });
+
+  document.addEventListener("pointerup", (e) => { if (arrasto && e.pointerId === arrasto.id) terminarArrasto(false); });
+  document.addEventListener("pointercancel", (e) => { if (arrasto && e.pointerId === arrasto.id) terminarArrasto(true); });
+  // Depois que a peça é pega, o dedo não pode rolar a página
+  document.addEventListener("touchmove", (e) => { if (arrasto && arrasto.iniciou && e.cancelable) e.preventDefault(); }, { passive: false });
+  $("estantes").addEventListener("contextmenu", (e) => { if (modoOrganizar) e.preventDefault(); });
+  $("estantes").addEventListener("dragstart", (e) => e.preventDefault());
+
+  function soltarSemArrastar() {
+    if (!arrasto) return;
+    clearTimeout(arrasto.timer);
+    arrasto = null;
+  }
+
+  function iniciarArrasto() {
+    const a = arrasto;
+    if (!a || a.iniciou) return;
+    clearTimeout(a.timer);
+    a.iniciou = true;
+
+    const r = a.peca.getBoundingClientRect();
+    a.dx = a.x - r.left; a.dy = a.y - r.top;
+    a.clone = a.peca.cloneNode(true);
+    a.clone.className = "livro-estante peca-voando";
+    a.clone.removeAttribute("data-chave");
+    a.clone.removeAttribute("onclick");
+    a.clone.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;
+    document.body.appendChild(a.clone);
+    a.peca.classList.add("fantasma");
+
+    try { a.peca.setPointerCapture(a.id); } catch (err) {}
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) {} }
+    document.body.classList.add("arrastando");
+    $("estantes").classList.add("sem-ima");
+    rolarSePreciso();
+  }
+
+  // Qual prateleira está embaixo do dedo?
+  function acharFileira(x, y) {
+    for (const f of document.querySelectorAll("#estantes .fileira")) {
+      const r = f.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top - 2 && y <= r.bottom + 10) return f;
+    }
+    return null;
+  }
+
+  function moverArrasto() {
+    const a = arrasto;
+    if (!a || !a.iniciou) return;
+    a.clone.style.left = (a.x - a.dx) + "px";
+    a.clone.style.top = (a.y - a.dy) + "px";
+
+    const f = acharFileira(a.x, a.y);
+    if (!f) return;
+    const outras = [...f.querySelectorAll(".livro-estante[data-chave]")].filter(n => n !== a.peca);
+    let i = 0;
+    for (const n of outras) { const r = n.getBoundingClientRect(); if (r.left + r.width / 2 < a.x) i++; }
+    const ref = outras[i] || null;
+
+    if (a.peca.parentNode === f) {
+      if (ref ? a.peca.nextElementSibling === ref : a.peca === f.lastElementChild) return;   // já está aí
+    } else if (outras.length) {
+      const usado = outras.reduce((s, n) => s + n.offsetWidth + 4, 0);
+      if (usado + a.peca.offsetWidth > f.clientWidth - 12) return;                            // não cabe nessa prateleira
+    }
+    f.insertBefore(a.peca, ref);
+    a.mudou = true;
+  }
+
+  // Perto das bordas da tela, a página rola sozinha (para cima/baixo e para a estante do lado)
+  function rolarSePreciso() {
+    const a = arrasto;
+    if (!a || !a.iniciou) return;
+    const topo = 110, base = window.innerHeight - 110;
+    let v = 0;
+    if (a.y < topo) v = -Math.ceil((topo - a.y) / 6);
+    else if (a.y > base) v = Math.ceil((a.y - base) / 6);
+    if (v) window.scrollBy(0, Math.max(-22, Math.min(22, v)));
+
+    const t = $("estantes"), rt = t.getBoundingClientRect();
+    let h = 0;
+    if (a.x < rt.left + 24) h = -10; else if (a.x > rt.right - 24) h = 10;
+    if (h) t.scrollLeft += h;
+
+    if (v || h) moverArrasto();
+    rolagemAuto = requestAnimationFrame(rolarSePreciso);
+  }
+
+  function arrumacaoDaTela() {
+    const est = [...document.querySelectorAll("#estantes .movel")].map(m =>
+      [...m.querySelectorAll(".fileira")].map(f => [...f.querySelectorAll("[data-chave]")].map(n => n.dataset.chave)));
+    while (est.length > 1 && est[est.length - 1].every(f => !f.length)) est.pop();
+    return est;
+  }
+
+  function terminarArrasto(cancelou) {
+    const a = arrasto;
+    if (!a) return;
+    clearTimeout(a.timer);
+    arrasto = null;
+    cancelAnimationFrame(rolagemAuto);
+    if (!a.iniciou) return;
+    document.body.classList.remove("arrastando");
+    $("estantes").classList.remove("sem-ima");
+    if (a.clone) a.clone.remove();
+    a.peca.classList.remove("fantasma");
+    ultimoArrasto = Date.now();
+    if (!cancelou && a.mudou) {
+      arrumacao = arrumacaoDaTela();
+      guardar("arrumacaoEstante", JSON.stringify(arrumacao));
+    }
+    redesenharDepois = false;
+    const rolagem = $("estantes").scrollLeft;
+    desenharEstante();
+    const t = $("estantes");
+    t.scrollLeft = Math.round(rolagem / Math.max(1, t.clientWidth)) * t.clientWidth;
+    atualizarPontos();
+  }
+
+  // ====== ESTANTE: PAPEL DE PAREDE, MODELO, ESTRUTURA E LUZES ======
+  // Devolve o "estilo" (CSS) da parede para um papel e uma cor
+  function estiloPapel(id, cor) {
+    if (id === "minha" && papelProprio) {
+      return `background-color:${cor};background-image:url(${papelProprio});background-size:cover;background-position:center;background-repeat:no-repeat`;
+    }
+    const p = PAPEIS[id] || PAPEIS.liso;
+    return `background-color:${cor};background-image:${p.imagem};background-size:${p.tamanho}`;
+  }
+
+  function aplicarEstante() {
+    $("parede").style.cssText = estiloPapel(papelEscolhido, corParedeAtual);
+    const m = MODELOS[modeloEscolhido];
+    const e = $("estantes");
+    e.style.setProperty("--m-moldura", m.moldura);
+    e.style.setProperty("--m-fundo", m.fundo);
+    e.style.setProperty("--m-tabua", m.tabua);
+    e.style.setProperty("--grao-v", graoSvg("v", m));
+    e.style.setProperty("--grao-h", graoSvg("h", m));
+    if (luzesEscolhidas !== "nenhuma") {
+      const luz = desenhosLuzes(luzesEscolhidas);
+      e.style.setProperty("--fio", luz.fio);
+      e.style.setProperty("--luz-a", luz.a);
+      e.style.setProperty("--luz-b", luz.b);
+    }
+  }
+
+  function htmlPersonalizar() {
+    const estruturas = [["inteira", "Estante inteira"], ["prateleiras", "Só prateleiras"]].map(([id, nome]) =>
+      `<button class="${estruturaEscolhida === id ? "ativo" : ""}" onclick="escolherEstrutura('${id}')">${nome}</button>`).join("");
+
+    const luzes = Object.entries(LUZES).map(([id, l]) =>
+      `<button class="${luzesEscolhidas === id ? "ativo" : ""}" onclick="escolherLuzes('${id}')">${l.nome}</button>`).join("");
+
+    const modelos = Object.entries(MODELOS).map(([id, m]) => `
+      <button class="chip ${modeloEscolhido === id ? "ativo" : ""}" onclick="escolherModelo('${id}')">
+        <span class="amostra-modelo" style="background-color:${m.fundo}; background-image:${graoSvg("v", m)}; border-color:${m.moldura}"></span>${m.nome}
+      </button>`).join("");
+
+    const papeis = Object.entries(PAPEIS).map(([id, p]) => `
+      <button class="chip ${papelEscolhido === id ? "ativo" : ""}" onclick="escolherPapel('${id}')">
+        <span class="tile-papel" data-papel="${id}" style="${estiloPapel(id, corParedeAtual)}"></span>${p.nome}
+      </button>`).join("");
+
+    const minha = `
+      <button class="chip ${papelEscolhido === "minha" ? "ativo" : ""}" onclick="escolherPapel('minha')">
+        ${papelProprio
+          ? `<span class="tile-papel" data-papel="minha" style="${estiloPapel("minha", corParedeAtual)}"></span>`
+          : `<span class="tile-papel" style="background:var(--campo)">+</span>`}
+        Minha imagem
+      </button>`;
+
+    const amostras = CORES_PAREDE.map(c =>
+      `<button class="amostra" style="background:${c}" onclick="escolherCorParede('${c}')" aria-label="Escolher cor"></button>`
+    ).join("");
+
+    return `
+      <h3 class="titulo-folha">Personalizar a estante</h3>
+      <p class="rotulo">Estrutura</p>
+      <div class="grupo">${estruturas}</div>
+      <p class="rotulo">Madeira</p>
+      <div class="chips">${modelos}</div>
+      <p class="rotulo">Luzes (em todas as prateleiras)</p>
+      <div class="grupo quebra">${luzes}</div>
+      <p class="rotulo">Cor do fundo</p>
+      <div class="linha-cor">
+        <input type="color" id="corParede" value="${corParedeAtual}" oninput="escolherCorParede(this.value)">
+        <span id="amostras">${amostras}</span>
+      </div>
+      <p class="rotulo">Papel de parede</p>
+      <div class="chips">${papeis}${minha}</div>
+      ${papelProprio ? `<div class="links">
+        <button class="link" onclick="escolherArquivoPapel()">Trocar imagem</button>
+        <button class="link" onclick="removerPapelProprio()">Remover imagem</button></div>` : ""}
+      <button class="fechar" onclick="fecharFolha()">Pronto</button>`;
+  }
+
+  function abrirPersonalizar() { mostrarFolha(htmlPersonalizar()); }
+
+  function escolherCorParede(cor) {
+    corParedeAtual = cor;
+    guardar("corParede", cor);
+    aplicarEstante();
+    // atualiza as miniaturas sem refazer a folha (senão o seletor de cor fecharia)
+    document.querySelectorAll(".tile-papel[data-papel]").forEach(t => { t.style.cssText = estiloPapel(t.dataset.papel, cor); });
+    const campo = $("corParede");
+    if (campo) campo.value = cor;
+  }
+
+  function escolherPapel(id) {
+    if (id === "minha" && !papelProprio) { escolherArquivoPapel(); return; }
+    papelEscolhido = id;
+    guardar("papelParede", id);
+    aplicarEstante();
+    atualizarFolha(htmlPersonalizar());
+  }
+
+  function escolherModelo(id) {
+    modeloEscolhido = id;
+    guardar("modeloEstante", id);
+    aplicarEstante();
+    atualizarFolha(htmlPersonalizar());
+  }
+
+  function escolherEstrutura(id) {
+    estruturaEscolhida = id;
+    guardar("estruturaEstante", id);
+    desenharEstante();
+    atualizarFolha(htmlPersonalizar());
+  }
+
+  function escolherLuzes(id) {
+    luzesEscolhidas = id;
+    guardar("luzesEstante", id);
+    aplicarEstante();
+    desenharEstante();
+    atualizarFolha(htmlPersonalizar());
+  }
+
+  function escolherArquivoPapel() { $("arquivoPapel").click(); }
+
+  function removerPapelProprio() {
+    papelProprio = "";
+    try { localStorage.removeItem("papelProprio"); } catch (e) {}
+    if (papelEscolhido === "minha") { papelEscolhido = "liso"; guardar("papelParede", "liso"); }
+    aplicarEstante();
+    atualizarFolha(htmlPersonalizar());
+  }
+
+  // Lê a foto escolhida, diminui (para caber no navegador) e usa como papel de parede
+  $("arquivoPapel").addEventListener("change", (e) => {
+    const arquivo = e.target.files[0];
+    e.target.value = "";
+    if (!arquivo) return;
+
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const escala = Math.min(1, 900 / Math.max(img.width, img.height));
+        const tela = document.createElement("canvas");
+        tela.width = Math.round(img.width * escala);
+        tela.height = Math.round(img.height * escala);
+        tela.getContext("2d").drawImage(img, 0, 0, tela.width, tela.height);
+        const dados = tela.toDataURL("image/jpeg", 0.8);
+
+        if (!guardar("papelProprio", dados)) { avisar("Essa imagem é grande demais para guardar"); return; }
+        papelProprio = dados;
+        papelEscolhido = "minha";
+        guardar("papelParede", "minha");
+        aplicarEstante();
+        if (!$("folha").hidden) atualizarFolha(htmlPersonalizar());
+      };
+      img.onerror = () => avisar("Não consegui abrir essa imagem");
+      img.src = leitor.result;
+    };
+    leitor.readAsDataURL(arquivo);
+  });
+
+  // ====== ESTANTE: ENFEITES ======
+  function salvarDecoracoes() { guardar("decoracoes", JSON.stringify(decoracoes)); }
+
+  function abrirDecorar() {
+    const opcoes = Object.entries(DECORACOES).map(([id, d]) => `
+      <button class="opcao-deco" onclick="adicionarDecoracao('${id}')">
+        <span class="fig">${svgDeco(id)}</span>${d.nome}
+      </button>`).join("");
+    const minha = `
+      <button class="opcao-deco" onclick="escolherArquivoDeco()">
+        <span class="fig"><span class="mais-deco">+</span></span>Minha imagem
+      </button>`;
+    mostrarFolha(`
+      <h3 class="titulo-folha">Decorar a estante</h3>
+      <p class="dica">Toque para colocar na estante. Depois use o botão Organizar para arrastar até o lugar que você quiser. Dica: uma imagem PNG sem fundo fica mais realista.</p>
+      <div class="opcoes-deco">${opcoes}${minha}</div>
+      <button class="fechar" onclick="fecharFolha()">Pronto</button>`);
+  }
+
+  function novoIdDeco() { return "d" + Date.now() + Math.floor(Math.random() * 1000); }
+
+  function adicionarDecoracao(tipo) {
+    decoracoes.push({ id: novoIdDeco(), tipo: tipo, lado: "fim", escala: 1 });
+    salvarDecoracoes();
+    desenharEstante();
+    avisar(DECORACOES[tipo].nome + " na estante");
+  }
+
+  function escolherArquivoDeco() { $("arquivoDeco").click(); }
+
+  // Lê a imagem escolhida, diminui e guarda (em PNG, para manter o fundo transparente)
+  $("arquivoDeco").addEventListener("change", (e) => {
+    const arquivo = e.target.files[0];
+    e.target.value = "";
+    if (!arquivo) return;
+
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const escala = Math.min(1, 220 / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * escala));
+        const h = Math.max(1, Math.round(img.height * escala));
+        const tela = document.createElement("canvas");
+        tela.width = w; tela.height = h;
+        tela.getContext("2d").drawImage(img, 0, 0, w, h);
+        const dados = tela.toDataURL("image/png");
+
+        const id = novoIdDeco();
+        if (!guardar("decoImg_" + id, dados)) { avisar("Essa imagem é grande demais para guardar"); return; }
+        cacheImagensDeco[id] = dados;
+        decoracoes.push({ id: id, tipo: "imagem", lado: "fim", escala: 1, w: w, h: h });
+        salvarDecoracoes();
+        fecharFolha();
+        desenharEstante();
+        avisar("Sua imagem está na estante");
+      };
+      img.onerror = () => avisar("Não consegui abrir essa imagem");
+      img.src = leitor.result;
+    };
+    leitor.readAsDataURL(arquivo);
+  });
+
+  function htmlDecoracao(d) {
+    const nome = d.tipo === "imagem" ? "Minha imagem" : DECORACOES[d.tipo].nome;
+    const tamanhos = [[0.8, "Pequeno"], [1, "Médio"], [1.2, "Grande"]].map(([v, n]) =>
+      `<button class="${(d.escala || 1) === v ? "ativo" : ""}" onclick="mudarTamanhoDeco('${d.id}', ${v})">${n}</button>`).join("");
+    return `
+      <h3 class="titulo-folha">${nome}</h3>
+      <p class="dica">Para mudar de lugar, use o botão Organizar e arraste.</p>
+      <p class="rotulo">Tamanho</p>
+      <div class="grupo">${tamanhos}</div>
+      <button class="perigo" onclick="removerDecoracao('${d.id}')">Tirar da estante</button>
+      <button class="fechar" onclick="fecharFolha()">Fechar</button>`;
+  }
+
+  function abrirDecoracao(id) {
+    const d = decoracoes.find(x => x.id === id);
+    if (d) mostrarFolha(htmlDecoracao(d));
+  }
+
+  function mudarTamanhoDeco(id, escala) {
+    const d = decoracoes.find(x => x.id === id);
+    d.escala = escala;
+    salvarDecoracoes();
+    desenharEstante();
+    atualizarFolha(htmlDecoracao(d));
+  }
+
+  function removerDecoracao(id) {
+    const d = decoracoes.find(x => x.id === id);
+    if (d && d.tipo === "imagem") {
+      try { localStorage.removeItem("decoImg_" + id); } catch (e) {}
+      delete cacheImagensDeco[id];
+    }
+    decoracoes = decoracoes.filter(x => x.id !== id);
+    salvarDecoracoes();
+    desenharEstante();
+    fecharFolha();
+  }
+
+  // ====== FOLHA (sobe de baixo) ======
+  function mostrarFolha(html) {
+    $("folha").innerHTML = html;
+    $("folha").scrollTop = 0;
+    $("fundoFolha").hidden = false;
+    $("folha").hidden = false;
+  }
+
+  // Troca o conteúdo sem pular a rolagem
+  function atualizarFolha(html) {
+    const rolagem = $("folha").scrollTop;
+    $("folha").innerHTML = html;
+    $("folha").scrollTop = rolagem;
+  }
+
+  function fecharFolha() {
+    $("fundoFolha").hidden = true;
+    $("folha").hidden = true;
+  }
+
+  // ====== DESENHAR: RESUMO (DASHBOARDS) ======
+  const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  let anoResumo = String(new Date().getFullYear());
+
+  function metaDoAno() { return parseInt(localStorage.getItem("metaAnual"), 10) || 0; }
+
+  // Sequência = meses seguidos com pelo menos um livro lido
+  function sequencias(lidos) {
+    const meses = new Set(lidos.map(l => l.dataLido.slice(0, 7)));
+    const chave = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    let atual = 0;
+    const d = new Date(); d.setDate(1);
+    if (!meses.has(chave(d))) d.setMonth(d.getMonth() - 1);   // o mês atual ainda não acabou: não quebra a sequência
+    while (meses.has(chave(d))) { atual++; d.setMonth(d.getMonth() - 1); }
+    let melhor = 0, corrida = 0, anterior = null;
+    [...meses].sort().forEach(m => {
+      const [a, mm] = m.split("-").map(Number);
+      const n = a * 12 + mm;
+      corrida = (anterior !== null && n === anterior + 1) ? corrida + 1 : 1;
+      melhor = Math.max(melhor, corrida);
+      anterior = n;
+    });
+    return { atual, melhor };
+  }
+
+  function barrasHorizontais(itens, classeNome) {
+    const maior = Math.max(1, ...itens.map(i => i.valor));
+    return `<div class="barras-h">` + itens.map(i => `
+      <div class="barra-h" data-dica="${limpar(i.dica)}">
+        <span class="nome ${classeNome || ""}">${i.rotulo}</span>
+        <span class="trilho"><div style="width:${i.valor ? i.valor / maior * 100 : 0}%"></div></span>
+        <span class="num">${i.valor}</span>
+      </div>`).join("") + `</div>`;
+  }
+
+  function tabelaDados(linhas) {
+    return `<details class="tabela-dados"><summary>Ver em tabela</summary><table>`
+      + linhas.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("") + `</table></details>`;
+  }
+
+  function desenharResumo() {
+    const todosLidos = minhaLista.filter(l => l.status === "lido" && l.dataLido);
+    const anoAtual = String(new Date().getFullYear());
+    const anos = [...new Set([anoAtual, ...todosLidos.map(l => l.dataLido.slice(0, 4))])].sort().reverse();
+    if (!anos.includes(anoResumo)) anoResumo = anoAtual;
+    const lidos = todosLidos.filter(l => l.dataLido.slice(0, 4) === anoResumo);
+    const qtd = lidos.length;
+
+    // 1) Meta do ano
+    const meta = metaDoAno();
+    let cartaoMeta;
+    if (meta) {
+      const pct = Math.min(100, Math.round(qtd / meta * 100));
+      let texto;
+      if (qtd >= meta) texto = "Meta batida! 🎉";
+      else if (anoResumo === anoAtual) {
+        const hojeD = new Date();
+        const mesesRestantes = 12 - hojeD.getMonth();
+        const porMes = Math.ceil((meta - qtd) / mesesRestantes);
+        texto = `Faltam ${meta - qtd}. Dá cerca de ${porMes} por mês até dezembro.`;
+      } else texto = `Faltaram ${meta - qtd} para a meta.`;
+      cartaoMeta = `
+        <div class="cartao">
+          <h3>Meta de ${anoResumo}</h3>
+          <div class="meta-numeros"><strong>${qtd}</strong><span>de ${meta} livros · ${pct}%</span></div>
+          <div class="barra-meta" role="progressbar" aria-valuenow="${qtd}" aria-valuemin="0" aria-valuemax="${meta}"><div style="width:${pct}%"></div></div>
+          <p class="meta-texto">${texto}</p>
+        </div>`;
+    } else {
+      cartaoMeta = `
+        <div class="cartao">
+          <h3>Meta de ${anoResumo}</h3>
+          <div class="meta-numeros"><strong>${qtd}</strong><span>${qtd === 1 ? "livro lido" : "livros lidos"}</span></div>
+          <p class="meta-texto">Você ainda não tem meta. <button class="link" onclick="mostrarAba('perfil'); $('campoMeta').focus()">Definir no Perfil</button></p>
+        </div>`;
+    }
+
+    // 2) Números rápidos
+    const comNota = lidos.filter(l => l.nota);
+    const media = comNota.length ? (comNota.reduce((s, l) => s + l.nota, 0) / comNota.length) : 0;
+    const seq = sequencias(todosLidos);
+    const blocos = `
+      <div class="blocos">
+        <div class="bloco-num"><strong>${qtd}</strong><span>lidos em ${anoResumo}</span></div>
+        <div class="bloco-num"><strong>${media ? media.toFixed(1).replace(".", ",") + " ★" : "–"}</strong><span>nota média</span></div>
+        <div class="bloco-num"><strong>${seq.atual}</strong><span>${seq.atual === 1 ? "mês seguido" : "meses seguidos"} lendo</span></div>
+        <div class="bloco-num"><strong>${seq.melhor}</strong><span>melhor sequência (meses)</span></div>
+      </div>`;
+
+    // 3) Livros lidos por mês
+    const porMes = MESES_CURTOS.map((_, i) => lidos.filter(l => Number(l.dataLido.slice(5, 7)) === i + 1));
+    const maiorMes = Math.max(1, ...porMes.map(m => m.length));
+    const mesHoje = anoResumo === anoAtual ? new Date().getMonth() : -1;
+    const colunas = porMes.map((m, i) => {
+      const nomes = m.map(l => l.titulo).slice(0, 3).join(", ") + (m.length > 3 ? "…" : "");
+      const dica = `${MESES_CURTOS[i]}: ${m.length} ${m.length === 1 ? "livro" : "livros"}${m.length ? " · " + nomes : ""}`;
+      return `<div class="mes ${i === mesHoje ? "atual" : ""}" data-dica="${limpar(dica)}">
+                ${m.length ? `<span class="valor">${m.length}</span>` : ""}
+                <div class="coluna" style="height:${m.length / maiorMes * 100}%"></div>
+              </div>`;
+    }).join("");
+    const cartaoMeses = `
+      <div class="cartao">
+        <h3>Livros lidos por mês</h3>
+        ${qtd ? `<div class="meses">${colunas}</div>
+        <div class="rotulos-meses">${MESES_CURTOS.map(m => `<span>${m[0]}</span>`).join("")}</div>
+        ${tabelaDados(porMes.map((m, i) => [MESES_CURTOS[i], m.length]))}`
+        : `<p class="vazio-dados">Nenhum livro lido em ${anoResumo} ainda.</p>`}
+      </div>`;
+
+    // 4) Minhas notas
+    const notas = [5, 4, 3, 2, 1].map(n => ({ n, qtd: lidos.filter(l => l.nota === n).length }));
+    const semNota = qtd - comNota.length;
+    const cartaoNotas = `
+      <div class="cartao">
+        <h3>Minhas notas</h3>
+        ${comNota.length ? `<p class="sub">${comNota.length} com nota${semNota ? ` · ${semNota} sem nota` : ""}</p>`
+          + barrasHorizontais(notas.map(x => ({ rotulo: "★".repeat(x.n), valor: x.qtd, dica: `${x.n} ${x.n === 1 ? "estrela" : "estrelas"}: ${x.qtd}` })), "estrelas-txt")
+          : `<p class="vazio-dados">Dê estrelas aos livros lidos (na página do livro) para ver aqui.</p>`}
+      </div>`;
+
+    // 5) Autores mais lidos
+    const contagem = {};
+    lidos.forEach(l => (l.autor || "Autor desconhecido").split(",").map(a => a.trim()).filter(Boolean)
+      .forEach(a => { contagem[a] = (contagem[a] || 0) + 1; }));
+    const autores = Object.entries(contagem).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5);
+    const cartaoAutores = `
+      <div class="cartao">
+        <h3>Autores mais lidos</h3>
+        ${autores.length ? barrasHorizontais(autores.map(([a, n]) => ({ rotulo: limpar(a), valor: n, dica: `${a}: ${n} ${n === 1 ? "livro" : "livros"}` })))
+          : `<p class="vazio-dados">Aparece aqui quando você terminar livros em ${anoResumo}.</p>`}
+      </div>`;
+
+    $("aba-resumo").innerHTML = `
+      <div class="painel-dados">
+        <div class="topo-dados">
+          <h2>Minhas leituras</h2>
+          <select onchange="anoResumo = this.value; desenharResumo()" aria-label="Ano">
+            ${anos.map(a => `<option value="${a}" ${a === anoResumo ? "selected" : ""}>${a}</option>`).join("")}
+          </select>
+        </div>
+        ${cartaoMeta}${blocos}${cartaoMeses}${cartaoNotas}${cartaoAutores}
+      </div>`;
+  }
+
+  // Dica ao passar o mouse ou tocar numa barra
+  function mostrarDica(e) {
+    const alvo = e.target.closest("[data-dica]");
+    const dica = $("dicaDados");
+    if (!alvo) { dica.hidden = true; return; }
+    const r = alvo.getBoundingClientRect();
+    dica.textContent = alvo.dataset.dica;
+    dica.hidden = false;
+    const largura = dica.offsetWidth;
+    const x = Math.min(window.innerWidth - largura / 2 - 8, Math.max(largura / 2 + 8, r.left + r.width / 2));
+    dica.style.left = x + "px";
+    dica.style.top = (r.top - 6) + "px";
+  }
+  $("aba-resumo").addEventListener("pointerover", mostrarDica);
+  $("aba-resumo").addEventListener("pointerdown", mostrarDica);
+  $("aba-resumo").addEventListener("pointerleave", () => { $("dicaDados").hidden = true; });
+  window.addEventListener("scroll", () => { $("dicaDados").hidden = true; }, { passive: true });
+
+  // ====== DESENHAR: PERFIL ======
+  function desenharPerfil() {
+    const nome = localStorage.getItem("nomeLeitor") || "";
+    const foto = localStorage.getItem("fotoPerfil") || "";
+    const frase = localStorage.getItem("fraseFavorita") || "";
+    const anoAtual = String(new Date().getFullYear());
+
+    $("foto").style.backgroundImage = foto ? `url(${foto})` : "";
+    $("foto").classList.toggle("com-foto", !!foto);
+    $("linksFoto").innerHTML = foto
+      ? `<button class="link" onclick="$('arquivoFoto').click()">Trocar foto</button><button class="link" onclick="removerFoto()">Remover</button>`
+      : `<button class="link" onclick="$('arquivoFoto').click()">Adicionar foto</button>`;
+    $("nomePerfil").textContent = nome || "Leitor(a)";
+    $("frasePerfil").textContent = frase ? "“" + frase + "”" : "";
+    $("anoMeta").textContent = anoAtual;
+
+    // Livro favorito: escolhe entre os seus livros
+    const favId = localStorage.getItem("livroFavorito") || "";
+    const opcoes = [...minhaLista].sort((a, b) => a.titulo.localeCompare(b.titulo));
+    $("campoFavorito").innerHTML = `<option value="">Escolha um dos seus livros</option>`
+      + opcoes.map(l => `<option value="${l.id}" ${l.id === favId ? "selected" : ""}>${limpar(l.titulo)}</option>`).join("");
+    const fav = minhaLista.find(l => l.id === favId);
+    $("mostraFavorito").innerHTML = fav ? `
+      <div class="favorito">
+        ${fav.capa ? `<img src="${fav.capa}" alt="">` : `<div class="sem-capa-mini">${limpar(fav.titulo)}</div>`}
+        <div><h4>${limpar(fav.titulo)}</h4><p>${limpar(fav.autor)}</p></div>
+      </div>` : "";
+
+    const lidosNoAno = minhaLista.filter(l => l.status === "lido" && l.dataLido.slice(0, 4) === anoAtual).length;
+    $("resumo").innerHTML =
+      `<p>📚 ${minhaLista.length} livros na sua lista</p>`
+      + `<p>✅ ${lidosNoAno} lidos em ${anoAtual}</p>`;
+  }
+
+  $("campoNome").value = localStorage.getItem("nomeLeitor") || "";
+  $("campoNome").addEventListener("input", () => {
+    localStorage.setItem("nomeLeitor", $("campoNome").value.trim());
+    desenharInicio();
+    desenharPerfil();
+  });
+
+  $("campoMeta").value = metaDoAno() || "";
+  $("campoMeta").addEventListener("input", () => {
+    const n = Math.max(0, Math.min(999, parseInt($("campoMeta").value, 10) || 0));
+    guardar("metaAnual", String(n));
+    desenharResumo();
+  });
+
+  $("campoFrase").value = localStorage.getItem("fraseFavorita") || "";
+  $("campoFrase").addEventListener("input", () => {
+    guardar("fraseFavorita", $("campoFrase").value.trim());
+    $("frasePerfil").textContent = $("campoFrase").value.trim() ? "“" + $("campoFrase").value.trim() + "”" : "";
+  });
+
+  $("campoFavorito").addEventListener("change", () => {
+    guardar("livroFavorito", $("campoFavorito").value);
+    desenharPerfil();
+  });
+
+  // Foto: diminui para 320px (para caber no navegador) e corta em quadrado
+  $("arquivoFoto").addEventListener("change", (e) => {
+    const arquivo = e.target.files[0];
+    e.target.value = "";
+    if (!arquivo) return;
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const lado = Math.min(img.width, img.height);
+        const tela = document.createElement("canvas");
+        tela.width = tela.height = 320;
+        tela.getContext("2d").drawImage(img, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado, 0, 0, 320, 320);
+        if (!guardar("fotoPerfil", tela.toDataURL("image/jpeg", 0.85))) { avisar("Essa foto é grande demais para guardar"); return; }
+        desenharPerfil();
+      };
+      img.onerror = () => avisar("Não consegui abrir essa imagem");
+      img.src = leitor.result;
+    };
+    leitor.readAsDataURL(arquivo);
+  });
+
+  function removerFoto() {
+    try { localStorage.removeItem("fotoPerfil"); } catch (e) {}
+    desenharPerfil();
+  }
+
+  function desenharTudo() {
+    desenharInicio();
+    desenharLista();
+    desenharEstante();
+    desenharResumo();
+    desenharPerfil();
+    desenharLivro();
+  }
+
+  // ====== COMEÇAR ======
+  aplicarTema();
+  aplicarEstante();
+  desenharTudo();
+  minhaLista.forEach(extrairCor);   // descobre a cor das capas que ainda não tem
+</script>
+</body>
+</html>
